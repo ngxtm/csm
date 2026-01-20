@@ -1,26 +1,30 @@
 # Phase 04: Fullstack Team Task Division
 
-**Team:** 6 Fullstack members | **Patterns:** Singleton + Factory Method
-**Updated:** 2026-01-19
+**Team:** 7 người (Lead + 6 Fullstack) | **Patterns:** Singleton + Factory Method
+**Updated:** 2026-01-20
 
-## Task Division (Option A - By Flow)
+## Task Division
 
 | Member | Domain | Backend | Frontend | Priority |
 |--------|--------|---------|----------|----------|
+| **Lead** | Stores, Products, Users & Auth | stores, products, categories, users, auth | Store settings, product catalog, login, user mgmt | P1 |
 | **FS1** | Orders & Status | orders module, order-status factory | Order list, detail, create pages | P1 |
 | **FS2** | Production & Recipe | production module, batch management | Production plan, recipe pages | P1 |
 | **FS3** | Inventory & Alerts | inventory module, transactions, alerts | Stock dashboard, alerts page | P2 |
 | **FS4** | Delivery & Tracking | deliveries module, shipment tracking | Shipment list, tracking page | P2 |
-| **FS5** | Users & Auth | users module, auth guards | Login, profile, user management | P1 |
-| **FS6** | Stores & Products | stores, products, categories | Store settings, product catalog | P1 |
+| **FS5** | Reports & Dashboard | reports module, analytics queries | Dashboard, charts, export | P2 |
+| **FS6** | Notifications | notifications module, push/email service | Notification center, settings | P3 |
 
 ### Flow Dependencies
 
 ```
-FS6 (Stores/Products) ──┬──► FS5 (Users/Auth) ──► FS1 (Orders) ──► FS2 (Production)
-                        │                               │                  │
-                        │                               ▼                  ▼
-                        └──────────────────────► FS3 (Inventory) ◄── FS4 (Delivery)
+Lead (Stores/Products/Auth) ──► FS1 (Orders) ──► FS2 (Production)
+           │                         │                  │
+           │                         ▼                  ▼
+           └────────────────► FS3 (Inventory) ◄── FS4 (Delivery)
+                                     │
+                                     ▼
+                              FS5 (Reports) ◄── FS6 (Notifications)
 ```
 
 ---
@@ -215,27 +219,27 @@ apps/web/src/lib/
 | Production & Recipe | FS2 | [fs2-production-recipe.md](./fs2-production-recipe.md) |
 | Inventory & Alerts | FS3 | [fs3-inventory-alerts.md](./fs3-inventory-alerts.md) |
 | Delivery & Tracking | FS4 | [fs4-delivery-tracking.md](./fs4-delivery-tracking.md) |
-| Users & Auth | FS5 | [fs5-users-auth.md](./fs5-users-auth.md) |
-| Stores & Products | FS6 | [fs6-stores-products.md](./fs6-stores-products.md) |
+| Reports & Dashboard | FS5 | [fs5-reports-dashboard.md](./fs5-reports-dashboard.md) |
+| Notifications | FS6 | [fs6-notifications.md](./fs6-notifications.md) |
 
 ---
 
 ## Timeline
 
-| Week | Lead | FS6 | FS5 | FS1 | FS2 | FS3 | FS4 |
+| Week | Lead | FS1 | FS2 | FS3 | FS4 | FS5 | FS6 |
 |------|------|-----|-----|-----|-----|-----|-----|
-| 1 | Shared code, patterns | Stores, Products | Auth guards | - | - | - | - |
-| 2 | Review, support | Products FE | Users CRUD, Login | Orders BE | - | Inventory BE | - |
-| 3 | Integration | - | User mgmt FE | Orders FE, Status | Production BE | Alerts | Delivery BE |
-| 4 | Testing | Polish | Polish | Status workflow | Production FE | Transactions FE | Tracking FE |
+| 1 | Stores, Products, Auth | - | - | - | - | - | - |
+| 2 | Users CRUD, Login | Orders BE | - | Inventory BE | - | - | - |
+| 3 | User mgmt FE | Orders FE, Status | Production BE | Alerts | Delivery BE | Reports BE | - |
+| 4 | Testing, Review | Status workflow | Production FE | Transactions FE | Tracking FE | Reports FE | Notifications |
 
 ---
 
 ## Startup Order
 
-1. **Lead:** Tạo shared services + factories (Week 1, Day 1-2)
-2. **FS6:** Stores + Products (Week 1, Day 2-5) - Base entities
-3. **FS5:** Auth + Users (Week 1-2) - Depends on Stores
-4. **FS1 + FS3:** Orders + Inventory (Week 2) - Parallel
-5. **FS2:** Production (Week 3) - Depends on Orders
-6. **FS4:** Delivery (Week 3) - Depends on Orders + Inventory
+1. **Lead:** Stores + Products + Auth + Users (Week 1-2)
+2. **FS1 + FS3:** Orders + Inventory (Week 2) - Parallel
+3. **FS2:** Production (Week 3) - Depends on Orders
+4. **FS4:** Delivery (Week 3) - Depends on Orders + Inventory
+5. **FS5:** Reports (Week 3-4) - Depends on all data modules
+6. **FS6:** Notifications (Week 4) - Depends on Reports
