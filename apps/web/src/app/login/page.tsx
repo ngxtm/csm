@@ -22,10 +22,10 @@ export default function LoginPage() {
 
     try {
       await signIn(email, password);
+      router.refresh(); // Refresh server components to get new auth state
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
-    } finally {
       setLoading(false);
     }
   }

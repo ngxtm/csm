@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/client';
+import { useAuthStore } from '@/lib/stores/auth.store';
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL;
 
@@ -11,20 +11,25 @@ interface ApiResponse<T> {
   message?: string;
 }
 
+/**
+ * Get access token from Zustand store (already synced by AuthProvider)
+ */
+function getAccessToken(): string | null {
+  const state = useAuthStore.getState();
+  return state.session?.access_token ?? null;
+}
+
 export async function apiClient<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<T> {
-  const supabase = createClient();
-  const {
-    data: { session },
-  } = await supabase.auth.getSession();
+  const accessToken = getAccessToken();
 
   const response = await fetch(`${API_URL}${endpoint}`, {
     ...options,
     headers: {
       'Content-Type': 'application/json',
-      Authorization: session ? `Bearer ${session.access_token}` : '',
+      ...(accessToken ? { Authorization: `Bearer ${accessToken}` } : {}),
       ...options.headers,
     },
   });
@@ -35,8 +40,6 @@ export async function apiClient<T>(
   }
 
   const json: ApiResponse<T> = await response.json();
-
-  // Extract data from wrapped response
   return json.data;
 }
 

@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/providers/auth-provider';
 import Link from 'next/link';
 
@@ -12,6 +14,35 @@ export default function DashboardLayout({
   children: React.ReactNode;
 }) {
   const { user, signOut, loading } = useAuth();
+  const [signingOut, setSigningOut] = useState(false);
+  const router = useRouter();
+
+  async function handleSignOut() {
+    if (signingOut) return;
+    setSigningOut(true);
+
+    try {
+      // Try signOut with timeout (Supabase can be slow)
+      const timeoutPromise = new Promise((_, reject) =>
+        setTimeout(() => reject(new Error('SignOut timeout')), 3000)
+      );
+      await Promise.race([signOut(), timeoutPromise]);
+    } catch {
+      // Ignore errors, continue with cleanup
+    }
+
+    // Clear persisted storage
+    localStorage.removeItem('auth-storage');
+    Object.keys(localStorage).forEach((key) => {
+      if (key.startsWith('sb-')) {
+        localStorage.removeItem(key);
+      }
+    });
+
+    // Redirect using Next.js router
+    router.refresh();
+    router.push('/login');
+  }
 
   if (loading) {
     return (
@@ -58,10 +89,11 @@ export default function DashboardLayout({
           <div className="border-t pt-4">
             <p className="truncate text-sm text-gray-600">{user.email}</p>
             <button
-              onClick={() => signOut()}
-              className="mt-2 text-sm text-red-600 hover:text-red-800"
+              onClick={handleSignOut}
+              disabled={signingOut}
+              className="mt-2 text-sm text-red-600 hover:text-red-800 disabled:opacity-50"
             >
-              Sign Out
+              {signingOut ? 'Signing out...' : 'Sign Out'}
             </button>
           </div>
         </div>
