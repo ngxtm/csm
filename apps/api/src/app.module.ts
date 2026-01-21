@@ -8,6 +8,7 @@ import { OrdersModule } from './orders/orders.module';
 import { CategoriesModule } from './categories/categories.module';
 import { StoresModule } from './stores/stores.module';
 import { ProductsModule } from './products/products.module';
+import { UsersModule } from './users/users.module';
 
 /**
  * AppModule - Root Module
@@ -32,6 +33,7 @@ import { ProductsModule } from './products/products.module';
     }),
     CommonModule, // Shared services (SupabaseService, CodeGeneratorService)
     AuthModule,
+    UsersModule, // User management
     CategoriesModule, // Product categories
     StoresModule, // Franchise stores & central kitchen
     ProductsModule, // Products (items table)

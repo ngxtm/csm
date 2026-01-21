@@ -29,18 +29,29 @@ import { createClient, SupabaseClient } from '@supabase/supabase-js';
 @Injectable()
 export class SupabaseService {
   private readonly _client: SupabaseClient;
+  private readonly _adminClient: SupabaseClient;
 
   constructor(private configService: ConfigService) {
-    this._client = createClient(
-      this.configService.getOrThrow<string>('SUPABASE_URL'),
-      this.configService.getOrThrow<string>('SUPABASE_SERVICE_ROLE_KEY'),
-      {
-        auth: {
-          autoRefreshToken: false,
-          persistSession: false,
-        },
-      },
+    const supabaseUrl = this.configService.getOrThrow<string>('SUPABASE_URL');
+    const serviceRoleKey = this.configService.getOrThrow<string>(
+      'SUPABASE_SERVICE_ROLE_KEY',
     );
+
+    // Standard client for database operations
+    this._client = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
+
+    // Admin client for auth operations (create/delete users)
+    this._adminClient = createClient(supabaseUrl, serviceRoleKey, {
+      auth: {
+        autoRefreshToken: false,
+        persistSession: false,
+      },
+    });
   }
 
   /**
@@ -49,6 +60,14 @@ export class SupabaseService {
    */
   get client(): SupabaseClient {
     return this._client;
+  }
+
+  /**
+   * Get the admin client for auth operations
+   * Use this for creating/deleting users via Supabase Admin API
+   */
+  get adminClient(): SupabaseClient {
+    return this._adminClient;
   }
 
   /**

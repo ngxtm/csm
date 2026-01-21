@@ -23,37 +23,22 @@
 - Auth guard implementation
 - Role-based access control
 
+### Backend - Users Module ✅ NEW
+- `apps/api/src/users/` - Full CRUD with role-based access
+- Endpoints: GET /users, GET /users/me, GET /users/:id, POST /users, PUT /users/:id, PUT /users/:id/role, DELETE /users/:id
+- Create user via Supabase Admin API + public.users sync
+
 ### Shared Services
-- `SupabaseService` - Singleton DB client
+- `SupabaseService` - Singleton DB client (with adminClient for user creation)
 - `CodeGeneratorService` - Generate unique codes
+- `EntityFactory`, `StatusFactory` - Abstract factories
 - Pagination DTO, HTTP exception filter, Transform interceptor
 
+### Frontend - Shared ✅ NEW
+- `apps/web/src/lib/stores/auth.store.ts` - Zustand auth state singleton
+- `apps/web/src/lib/query-client.ts` - React Query singleton
+
 ## In Progress 🔄
-
-### Backend - Users Module
-
-```
-apps/api/src/users/
-├── users.module.ts
-├── users.controller.ts
-├── users.service.ts
-└── dto/
-    ├── create-user.dto.ts
-    ├── update-user.dto.ts
-    └── user-response.dto.ts
-```
-
-#### Endpoints
-
-| Method | Endpoint | Description | Roles |
-|--------|----------|-------------|-------|
-| GET | /users | List users (paginated) | admin, manager |
-| GET | /users/me | Current user profile | all |
-| GET | /users/:id | User detail | admin, manager |
-| POST | /users | Create user | admin |
-| PUT | /users/:id | Update user | admin, self |
-| DELETE | /users/:id | Deactivate user | admin |
-| PUT | /users/:id/role | Change user role | admin |
 
 ### Frontend - Auth & User Management
 
@@ -107,15 +92,6 @@ apps/web/src/features/products/
 ```
 
 ## Pending 📋
-
-### Shared Code for Team
-
-| Item | Description | For |
-|------|-------------|-----|
-| `EntityFactory` | Abstract factory for entity creation | FS1, FS2, FS4 |
-| `StatusFactory` | Abstract factory for status transitions | FS1, FS2, FS4 |
-| `auth.store.ts` | Zustand auth state | All FE |
-| `query-client.ts` | React Query singleton | All FE |
 
 ### Code Review & Support
 
