@@ -295,7 +295,7 @@ export type Database = {
           sku: string | null;
           type: string;
           unit: string;
-          unit_price: number | null;
+          current_price: number | null;
           updated_at: string | null;
         };
         Insert: {
@@ -309,7 +309,7 @@ export type Database = {
           sku?: string | null;
           type: string;
           unit: string;
-          unit_price?: number | null;
+          current_price?: number | null;
           updated_at?: string | null;
         };
         Update: {
@@ -323,7 +323,7 @@ export type Database = {
           sku?: string | null;
           type?: string;
           unit?: string;
-          unit_price?: number | null;
+          current_price?: number | null;
           updated_at?: string | null;
         };
         Relationships: [
@@ -343,6 +343,7 @@ export type Database = {
           notes: string | null;
           order_id: number;
           quantity_ordered: number;
+          unit_price: number;
         };
         Insert: {
           id?: number;
@@ -350,6 +351,7 @@ export type Database = {
           notes?: string | null;
           order_id: number;
           quantity_ordered: number;
+          unit_price: number;
         };
         Update: {
           id?: number;
@@ -357,6 +359,7 @@ export type Database = {
           notes?: string | null;
           order_id?: number;
           quantity_ordered?: number;
+          unit_price: number;
         };
         Relationships: [
           {
