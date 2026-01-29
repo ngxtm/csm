@@ -15,7 +15,6 @@ import { CreateOrderDto, UpdateOrderStatusDto } from './dto/order.dto';
  * SUPABASE CLIENT:
  * - Dùng SERVICE_ROLE_KEY để bypass RLS (Row Level Security)
  * - Backend đã validate user qua JWT, nên có full access
- * - Nhưng vẫn filter theo chain_id để đảm bảo data isolation
  */
 @Injectable()
 export class OrdersService {
@@ -46,11 +45,10 @@ export class OrdersService {
   /**
    * Lấy danh sách orders với pagination
    *
-   * @param chainId - Chain ID từ JWT (data isolation)
    * @param pagination - { page, limit }
    * @returns { data: Order[], meta: { total, page, limit, totalPages } }
    */
-  async findAll(chainId: number, pagination: PaginationDto) {
+  async findAll(pagination: PaginationDto) {
     const { page, limit } = pagination;
     const offset = (page - 1) * limit;
 
@@ -62,16 +60,15 @@ export class OrdersService {
         *,
         order_items (
           id,
-          product_id,
-          quantity,
+          item_id,
+          quantity_ordered,
           unit_price,
-          products ( name )
+          items ( name )
         ),
         stores ( name )
       `,
         { count: 'exact' }, // Trả về total count
       )
-      .eq('chain_id', chainId) // Filter theo chain (data isolation)
       .order('created_at', { ascending: false }) // Mới nhất trước
       .range(offset, offset + limit - 1); // Pagination
 
@@ -91,7 +88,7 @@ export class OrdersService {
   /**
    * Lấy chi tiết 1 order
    */
-  async findOne(id: number, chainId: number) {
+  async findOne(id: number) {
     const { data, error } = await this.supabase
       .from('orders')
       .select(
@@ -99,16 +96,15 @@ export class OrdersService {
         *,
         order_items (
           id,
-          product_id,
-          quantity,
+          item_id,
+          quantity_ordered,
           unit_price,
-          products ( name )
+          items ( name )
         ),
         stores ( name )
       `,
       )
       .eq('id', id)
-      .eq('chain_id', chainId) // Đảm bảo user chỉ xem được order của chain mình
       .single();
 
     if (error || !data) {
@@ -122,24 +118,23 @@ export class OrdersService {
    * Tạo order mới
    *
    * FLOW:
-   * 1. Generate order number
+   * 1. Generate order code
    * 2. Insert order record
    * 3. Insert order items
    * 4. Return complete order
    */
-  async create(dto: CreateOrderDto, user: { id: string; chainId: number }) {
-    // Generate unique order number: ORD-YYYYMMDD-XXXXX
-    const orderNumber = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-5)}`;
+  async create(dto: CreateOrderDto, user: { id: string }) {
+    // Generate unique order code: ORD-YYYYMMDD-XXXXX
+    const orderCode = `ORD-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${Date.now().toString().slice(-5)}`;
 
     // Insert order
     const { data: order, error: orderError } = await this.supabase
       .from('orders')
       .insert({
-        chain_id: user.chainId,
         store_id: dto.storeId,
-        order_number: orderNumber,
-        status: 'draft',
-        requested_date: dto.requestedDate,
+        order_code: orderCode,
+        status: 'pending',
+        delivery_date: dto.deliveryDate,
         notes: dto.notes,
         created_by: user.id,
       })
@@ -150,10 +145,9 @@ export class OrdersService {
 
     // Insert order items
     const items = dto.items.map((item) => ({
-      chain_id: user.chainId,
       order_id: order.id,
-      product_id: item.productId,
-      quantity: item.quantity,
+      item_id: item.productId,
+      quantity_ordered: item.quantity,
     }));
 
     const { error: itemsError } = await this.supabase.from('order_items').insert(items);
@@ -161,17 +155,17 @@ export class OrdersService {
     if (itemsError) this.handleError(itemsError, 'Failed to create order items');
 
     // Return complete order with items
-    return this.findOne(order.id, user.chainId);
+    return this.findOne(order.id);
   }
 
   /**
    * Update order status
    *
    * VÍ DỤ STATUS FLOW:
-   * draft → submitted → confirmed → in_production → ready → in_delivery → delivered
-   *                                                                    ↘ cancelled
+   * pending → approved → processing → shipping → delivered
+   *                                           ↘ cancelled
    */
-  async updateStatus(id: number, dto: UpdateOrderStatusDto, chainId: number) {
+  async updateStatus(id: number, dto: UpdateOrderStatusDto) {
     const { data, error } = await this.supabase
       .from('orders')
       .update({
@@ -180,7 +174,6 @@ export class OrdersService {
         updated_at: new Date().toISOString(),
       })
       .eq('id', id)
-      .eq('chain_id', chainId)
       .select()
       .single();
 
@@ -188,7 +181,7 @@ export class OrdersService {
       throw new NotFoundException(`Order #${id} not found`);
     }
 
-    return this.findOne(id, chainId);
+    return this.findOne(id);
   }
 
   // ═══════════════════════════════════════════════════════════
@@ -207,27 +200,26 @@ export class OrdersService {
    * Transform single order
    *
    * INPUT (from DB):
-   * { id: 1, chain_id: 1, store_id: 1, order_number: 'ORD-001', ... }
+   * { id: 1, store_id: 1, order_code: 'ORD-001', ... }
    *
    * OUTPUT (to API):
-   * { id: 1, chainId: 1, storeId: 1, orderNumber: 'ORD-001', ... }
+   * { id: 1, storeId: 1, orderCode: 'ORD-001', ... }
    */
   private transformOrder(order: OrderRow) {
     return {
       id: order.id,
-      chainId: order.chain_id,
       storeId: order.store_id,
       storeName: order.stores?.name,
-      orderNumber: order.order_number,
+      orderCode: order.order_code,
       status: order.status,
-      requestedDate: order.requested_date,
+      deliveryDate: order.delivery_date,
       totalAmount: order.total_amount,
       notes: order.notes,
       items: (order.order_items || []).map((item) => ({
         id: item.id,
-        productId: item.product_id,
-        productName: item.products?.name,
-        quantity: item.quantity,
+        itemId: item.item_id,
+        itemName: item.items?.name,
+        quantity: item.quantity_ordered,
         unitPrice: item.unit_price,
       })),
       createdAt: order.created_at,
@@ -250,19 +242,18 @@ export class OrdersService {
  */
 interface OrderItemRow {
   id: number;
-  product_id: number;
-  quantity: number;
+  item_id: number;
+  quantity_ordered: number;
   unit_price: number | null;
-  products?: { name: string };
+  items?: { name: string };
 }
 
 interface OrderRow {
   id: number;
-  chain_id: number;
   store_id: number;
-  order_number: string;
+  order_code: string;
   status: string;
-  requested_date: string;
+  delivery_date: string | null;
   total_amount: number | null;
   notes: string | null;
   created_at: string;

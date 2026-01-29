@@ -52,14 +52,13 @@ export class OrdersController {
    * }
    */
   @Get()
-  @ApiOperation({ summary: 'List orders for current chain' })
+  @ApiOperation({ summary: 'List all orders' })
   @ApiResponse({ status: 200, description: 'List of orders with pagination' })
   @Roles('admin', 'manager', 'coordinator', 'store_staff')
   findAll(
-    @CurrentUser() user: AuthUser, // Inject từ JWT
     @Query() pagination: PaginationDto, // Auto-validate & transform
   ) {
-    return this.ordersService.findAll(user.chainId, pagination);
+    return this.ordersService.findAll(pagination);
   }
 
   /**
@@ -77,9 +76,8 @@ export class OrdersController {
   @Roles('admin', 'manager', 'coordinator', 'store_staff')
   findOne(
     @Param('id', ParseIntPipe) id: number, // ParseIntPipe validate & convert
-    @CurrentUser() user: AuthUser,
   ) {
-    return this.ordersService.findOne(id, user.chainId);
+    return this.ordersService.findOne(id);
   }
 
   /**
@@ -119,8 +117,7 @@ export class OrdersController {
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateOrderStatusDto,
-    @CurrentUser() user: AuthUser,
   ) {
-    return this.ordersService.updateStatus(id, dto, user.chainId);
+    return this.ordersService.updateStatus(id, dto);
   }
 }

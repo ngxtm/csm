@@ -287,6 +287,7 @@ export type Database = {
         Row: {
           category_id: number | null
           created_at: string | null
+          current_price: number | null
           description: string | null
           id: number
           image_url: string | null
@@ -300,6 +301,7 @@ export type Database = {
         Insert: {
           category_id?: number | null
           created_at?: string | null
+          current_price?: number | null
           description?: string | null
           id?: number
           image_url?: string | null
@@ -313,6 +315,7 @@ export type Database = {
         Update: {
           category_id?: number | null
           created_at?: string | null
+          current_price?: number | null
           description?: string | null
           id?: number
           image_url?: string | null

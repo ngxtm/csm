@@ -24,12 +24,10 @@ import { Type } from 'class-transformer';
  * 3. Export cho service/controller dùng nếu cần
  */
 export const ORDER_STATUSES = [
-  'draft',
-  'submitted',
-  'confirmed',
-  'in_production',
-  'ready',
-  'in_delivery',
+  'pending',
+  'approved',
+  'processing',
+  'shipping',
   'delivered',
   'cancelled',
 ] as const;
@@ -62,7 +60,7 @@ export class CreateOrderItemDto {
  * POST /orders
  * {
  *   "storeId": 1,
- *   "requestedDate": "2026-01-20",
+ *   "deliveryDate": "2026-01-20",
  *   "notes": "Urgent order",
  *   "items": [{ "productId": 1, "quantity": 10 }]
  * }
@@ -73,9 +71,10 @@ export class CreateOrderDto {
   @IsPositive()
   storeId: number;
 
-  @ApiProperty({ description: 'Requested delivery date', example: '2026-01-20' })
+  @ApiPropertyOptional({ description: 'Requested delivery date', example: '2026-01-20' })
+  @IsOptional()
   @IsDateString()
-  requestedDate: string;
+  deliveryDate?: string;
 
   @ApiPropertyOptional({ description: 'Additional notes' })
   @IsOptional()
@@ -98,7 +97,7 @@ export class CreateOrderDto {
  *
  * VÍ DỤ REQUEST:
  * PUT /orders/1/status
- * { "status": "confirmed", "notes": "Approved by manager" }
+ * { "status": "approved", "notes": "Approved by manager" }
  *
  * VALIDATION:
  * - @IsIn(ORDER_STATUSES) đảm bảo chỉ accept status hợp lệ

@@ -26,12 +26,10 @@ const isoDateString = z.string().regex(
 // ═══════════════════════════════════════════════════════════
 
 export const OrderStatus = z.enum([
-  'draft',
-  'submitted',
-  'confirmed',
-  'in_production',
-  'ready',
-  'in_delivery',
+  'pending',
+  'approved',
+  'processing',
+  'shipping',
   'delivered',
   'cancelled',
 ]);
@@ -49,7 +47,7 @@ export type CreateOrderItemDto = z.infer<typeof CreateOrderItemDto>;
 
 export const CreateOrderDto = z.object({
   storeId: z.number().int().positive(),
-  requestedDate: isoDateString, // Using non-deprecated validator
+  deliveryDate: isoDateString.optional(), // Using non-deprecated validator
   notes: z.string().optional(),
   items: z.array(CreateOrderItemDto).min(1),
 });
@@ -66,13 +64,13 @@ export type OrderItemResponse = z.infer<typeof OrderItemResponse>;
 
 export const OrderResponse = z.object({
   id: z.number(),
-  chainId: z.number(),
   storeId: z.number(),
   storeName: z.string().optional(),
-  orderNumber: z.string(),
+  orderCode: z.string(),
   status: OrderStatus,
-  requestedDate: z.string(),
+  deliveryDate: z.string().nullable(),
   totalAmount: z.number().nullable(),
+  notes: z.string().nullable(),
   items: z.array(OrderItemResponse),
   createdAt: z.string(),
   updatedAt: z.string(),
