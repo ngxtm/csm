@@ -3,7 +3,6 @@
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
-/* eslint-disable prettier/prettier */
 import {
   BadRequestException,
   ForbiddenException,
@@ -78,7 +77,6 @@ export class DeliveriesService {
   }
 
   async create(dto: CreateShipmentDto, user: AuthUser) {
-    // 1️⃣ Validate order
     const { data: order } = await this.supabase
       .from('orders')
       .select('id, status, store_id')
@@ -138,7 +136,6 @@ export class DeliveriesService {
       throw new BadRequestException('Insufficient batch stock');
     }
 
-    // 2️⃣ Insert shipment item
     const { error } = await this.supabase.from('shipment_items').insert({
       shipment_id: shipmentId,
       order_item_id: dto.orderItemId,
@@ -149,16 +146,27 @@ export class DeliveriesService {
 
     if (error) throw new InternalServerErrorException(error.message);
 
-    // 3️⃣ Export inventory (FS3 hook)
-    // await this.supabase.from('inventory_transactions').insert({
-    //   store_id: null, // central kitchen
-    //   item_id: batch.item_id,
-    //   batch_id: dto.batchId,
-    //   quantity_change: -dto.quantityShipped,
-    //   transaction_type: 'export',
-    //   reference_type: 'shipment',
-    //   reference_id: shipmentId,
-    // });
+    const { data, error: shipmentError } = await this.supabase
+      .from('shipments')
+      .select('orders(store_id)')
+      .eq('id', shipmentId)
+      .single();
+
+    if (!data?.orders?.store_id) {
+      throw new BadRequestException('Invalid shipment or order');
+    }
+
+    const storeId = data.orders.store_id;
+
+    await this.supabase.from('inventory_transactions').insert({
+      store_id: storeId, // ✅ number
+      item_id: batch.item_id,
+      batch_id: dto.batchId,
+      quantity_change: -dto.quantityShipped,
+      transaction_type: 'export',
+      reference_type: 'shipment',
+      reference_id: shipmentId,
+    });
 
     return { success: true };
   }

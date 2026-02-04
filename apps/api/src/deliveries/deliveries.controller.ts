@@ -30,6 +30,10 @@ import type { AuthUser } from '../auth';
 export class DeliveriesController {
   constructor(private readonly service: DeliveriesService) {}
 
+  /**
+   *
+   * @returns
+   */
   @Get()
   @ApiOperation({ summary: 'List shipments' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR)
@@ -37,6 +41,12 @@ export class DeliveriesController {
     return this.service.findAll();
   }
 
+  /**
+   * 
+   * @param id 
+   * @param user 
+   * @returns 
+   */
   @Get(':id')
   @ApiOperation({ summary: 'Shipment detail' })
   @ApiParam({ name: 'id', type: Number })
@@ -48,6 +58,12 @@ export class DeliveriesController {
     return this.service.findOne(id, user);
   }
 
+  /**
+   * 
+   * @param dto 
+   * @param user 
+   * @returns 
+   */
   @Post()
   @ApiOperation({ summary: 'Create shipment from order' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR)
@@ -55,6 +71,13 @@ export class DeliveriesController {
     return this.service.create(dto, user);
   }
 
+  /**
+   * 
+   * @param id 
+   * @param dto 
+   * @param user 
+   * @returns 
+   */
   @Put(':id/status')
   @ApiOperation({ summary: 'Update shipment status' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR, UserRoleEnum.STORE_STAFF)
@@ -66,12 +89,23 @@ export class DeliveriesController {
     return this.service.updateStatus(id, dto, user);
   }
 
+  /**
+   * 
+   * @param id 
+   * @returns 
+   */
   @Get(':id/items')
   @ApiOperation({ summary: 'List shipment items' })
   findItems(@Param('id', ParseIntPipe) id: number) {
     return this.service.getItems(id);
   }
 
+  /**
+   * 
+   * @param id 
+   * @param dto 
+   * @returns 
+   */
   @Post(':id/items')
   @ApiOperation({ summary: 'Add shipment item (with batch)' })
   @Roles(UserRoleEnum.COORDINATOR)
