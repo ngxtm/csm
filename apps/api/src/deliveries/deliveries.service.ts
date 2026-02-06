@@ -159,7 +159,7 @@ export class DeliveriesService {
     const storeId = data.orders.store_id;
 
     await this.supabase.from('inventory_transactions').insert({
-      store_id: storeId, // ✅ number
+      store_id: storeId,
       item_id: batch.item_id,
       batch_id: dto.batchId,
       quantity_change: -dto.quantityShipped,

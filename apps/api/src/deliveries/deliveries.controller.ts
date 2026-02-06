@@ -12,6 +12,7 @@ import {
   ApiBearerAuth,
   ApiOperation,
   ApiParam,
+  ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
 import { Roles, CurrentUser } from '../auth';
@@ -24,6 +25,11 @@ import {
 import { DeliveriesService } from './deliveries.service';
 import type { AuthUser } from '../auth';
 
+/**
+ * Deliveries Controller
+ * 
+ * Manages shipments, shipment items, and deliver status tracking
+ */
 @ApiTags('deliveries')
 @ApiBearerAuth()
 @Controller('deliveries')
@@ -31,25 +37,24 @@ export class DeliveriesController {
   constructor(private readonly service: DeliveriesService) {}
 
   /**
-   *
-   * @returns
+   * GET /deliveries - List shipments
    */
   @Get()
   @ApiOperation({ summary: 'List shipments' })
+  @ApiResponse({ status: 200, description: 'List of shipments' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR)
   findAll() {
     return this.service.findAll();
   }
 
   /**
-   * 
-   * @param id 
-   * @param user 
-   * @returns 
+   * GET /deliveries/:id - Shipment detail
    */
   @Get(':id')
   @ApiOperation({ summary: 'Shipment detail' })
   @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Shipment details' })
+  @ApiResponse({ status: 404, description: 'Shipment not found' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR, UserRoleEnum.STORE_STAFF)
   findOne(
     @Param('id', ParseIntPipe) id: number,
@@ -59,24 +64,18 @@ export class DeliveriesController {
   }
 
   /**
-   * 
-   * @param dto 
-   * @param user 
-   * @returns 
+   * POST /deliveries - Create shipment from order
    */
   @Post()
   @ApiOperation({ summary: 'Create shipment from order' })
-  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR)
+  @ApiResponse({ status: 201, description: 'Shipment created' })
+  @ApiResponse({ status: 400, description: 'Validation failed' })
   create(@Body() dto: CreateShipmentDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user);
   }
 
   /**
-   * 
-   * @param id 
-   * @param dto 
-   * @param user 
-   * @returns 
+   * PUT /deliveries/:id/status - Update shipment status
    */
   @Put(':id/status')
   @ApiOperation({ summary: 'Update shipment status' })
@@ -90,9 +89,7 @@ export class DeliveriesController {
   }
 
   /**
-   * 
-   * @param id 
-   * @returns 
+   * GET /deliveries/:id/items - List shipment items
    */
   @Get(':id/items')
   @ApiOperation({ summary: 'List shipment items' })
@@ -101,10 +98,7 @@ export class DeliveriesController {
   }
 
   /**
-   * 
-   * @param id 
-   * @param dto 
-   * @returns 
+   * POST /deliveries/:id/items - Add shipment item (with batch)
    */
   @Post(':id/items')
   @ApiOperation({ summary: 'Add shipment item (with batch)' })
