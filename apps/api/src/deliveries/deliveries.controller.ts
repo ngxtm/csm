@@ -42,7 +42,7 @@ export class DeliveriesController {
   @Get()
   @ApiOperation({ summary: 'List shipments' })
   @ApiResponse({ status: 200, description: 'List of shipments' })
-  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR)
+  @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR, UserRoleEnum.STORE_STAFF)
   findAll() {
     return this.service.findAll();
   }
@@ -79,6 +79,10 @@ export class DeliveriesController {
    */
   @Put(':id/status')
   @ApiOperation({ summary: 'Update shipment status' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'Shipment status updated' })
+  @ApiResponse({ status: 400, description: 'Invalid status transition' })
+  @ApiResponse({ status: 404, description: 'Shipment not found' })
   @Roles(UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR, UserRoleEnum.STORE_STAFF)
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
@@ -93,6 +97,9 @@ export class DeliveriesController {
    */
   @Get(':id/items')
   @ApiOperation({ summary: 'List shipment items' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 200, description: 'List of shipment items' })
+  @ApiResponse({ status: 404, description: 'Shipment not found' })
   findItems(@Param('id', ParseIntPipe) id: number) {
     return this.service.getItems(id);
   }
@@ -102,6 +109,10 @@ export class DeliveriesController {
    */
   @Post(':id/items')
   @ApiOperation({ summary: 'Add shipment item (with batch)' })
+  @ApiParam({ name: 'id', type: Number })
+  @ApiResponse({ status: 201, description: 'Shipment item added' })
+  @ApiResponse({ status: 400, description: 'Invalid batch or quantity' })
+  @ApiResponse({ status: 404, description: 'Shipment not found' })
   @Roles(UserRoleEnum.COORDINATOR)
   addItem(
     @Param('id', ParseIntPipe) id: number,

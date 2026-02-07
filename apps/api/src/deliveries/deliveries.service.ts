@@ -70,7 +70,9 @@ export class DeliveriesService {
       user.role === UserRoleEnum.STORE_STAFF &&
       user.storeId !== data.orders.store_id
     ) {
-      throw new ForbiddenException();
+      throw new ForbiddenException(
+        `Store staffs are only allowed to view the shipment list in their store`,
+      );
     }
 
     return data;
