@@ -9,5 +9,5 @@ export * from './order';
 export * from './category';
 export * from './store';
 export * from './product';
-export * from './shipment';
-export * from './shipment-item';
+export * from "./shipment";
+export * from "./shipment-item";
