@@ -1,4 +1,5 @@
-import { api } from "./client";
+"use client";
+import { api } from "@/lib/api";
 import type {
   ShipmentItemResponse,
 } from "@repo/types";

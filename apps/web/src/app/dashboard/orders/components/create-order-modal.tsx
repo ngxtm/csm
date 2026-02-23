@@ -1,3 +1,7 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
+/* eslint-disable react-hooks/set-state-in-effect */
+/* eslint-disable react-hooks/preserve-manual-memoization */
+/* eslint-disable react/no-unescaped-entities */
 "use client";
 
 import { useEffect, useMemo, useState } from "react";

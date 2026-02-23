@@ -4,16 +4,33 @@ import type {
   CreateShipmentDto,
   UpdateShipmentStatusDto,
 } from "@repo/types";
+import type { PaginationMeta } from "@repo/types";
+
+interface PaginatedResponse<T> {
+  data: T[];
+  meta: PaginationMeta;
+}
 
 /**
- * Shipments API
+ * Shipments API Service
  */
 export const shipmentsApi = {
   /**
-   * Get all shipments
+   * Get shipments (with optional pagination)
    */
-  getAll: () =>
-    api.get<ShipmentResponse[]>("/shipments"),
+  getAll: (query?: { page?: number; limit?: number; status?: string }) => {
+    const params = new URLSearchParams();
+
+    if (query?.page) params.set("page", String(query.page));
+    if (query?.limit) params.set("limit", String(query.limit));
+    if (query?.status) params.set("status", query.status);
+
+    const queryString = params.toString();
+
+    return api.get<PaginatedResponse<ShipmentResponse>>(
+      `/shipments${queryString ? `?${queryString}` : ""}`
+    );
+  },
 
   /**
    * Get shipment by ID
@@ -34,14 +51,8 @@ export const shipmentsApi = {
     id: number,
     data: UpdateShipmentStatusDto
   ) =>
-    api.put<ShipmentResponse>(
+    api.patch<ShipmentResponse>(
       `/shipments/${id}/status`,
       data
     ),
-
-  /**
-   * Delete shipment
-   */
-  delete: (id: number) =>
-    api.delete(`/shipments/${id}`),
 };
