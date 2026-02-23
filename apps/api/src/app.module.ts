@@ -9,7 +9,7 @@ import { CategoriesModule } from './categories/categories.module';
 import { StoresModule } from './stores/stores.module';
 import { ProductsModule } from './products/products.module';
 import { UsersModule } from './users/users.module';
-import { DeliveriesModule } from './deliveries';
+import { ShipmentsModule } from './shipments/shipments.module';
 
 /**
  * AppModule - Root Module
@@ -39,7 +39,7 @@ import { DeliveriesModule } from './deliveries';
     StoresModule, // Franchise stores & central kitchen
     ProductsModule, // Products (items table)
     OrdersModule, // Template module cho FS team reference
-    DeliveriesModule, // Deliveries module
+    ShipmentsModule, // Shipments module
   ],
   controllers: [AppController],
   providers: [AppService],

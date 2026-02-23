@@ -21,23 +21,23 @@ import {
   AddShipmentItemDto,
   CreateShipmentDto,
   UpdateShipmentStatusDto,
-} from './dto/delivery.dto';
-import { DeliveriesService } from './deliveries.service';
+} from './dto/shipment.dto';
+import { ShipmentsService } from './shipments.service'
 import type { AuthUser } from '../auth';
 
 /**
- * Deliveries Controller
+ * Shipments Controller
  * 
  * Manages shipments, shipment items, and deliver status tracking
  */
-@ApiTags('deliveries')
+@ApiTags('shipments')
 @ApiBearerAuth()
-@Controller('deliveries')
-export class DeliveriesController {
-  constructor(private readonly service: DeliveriesService) {}
+@Controller('shipments')
+export class ShipmentsController {
+  constructor(private readonly service: ShipmentsService) {}
 
   /**
-   * GET /deliveries - List shipments
+   * GET /shipments - List shipments
    */
   @Get()
   @ApiOperation({ summary: 'List shipments' })
@@ -47,7 +47,7 @@ export class DeliveriesController {
   }
 
   /**
-   * GET /deliveries/:id - Shipment detail
+   * GET /shipments/:id - Shipment detail
    */
   @Get(':id')
   @ApiOperation({ summary: 'Shipment detail' })
@@ -62,19 +62,19 @@ export class DeliveriesController {
   }
 
   /**
-   * POST /deliveries - Create shipment from order
+   * POST /shipments - Create shipment from order
    */
   @Post()
   @ApiOperation({ summary: 'Create shipment from order' })
   @ApiResponse({ status: 201, description: 'Shipment created' })
   @ApiResponse({ status: 400, description: 'Validation failed' })
-  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR)
+  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR, UserRoleEnum.ADMIN)
   create(@Body() dto: CreateShipmentDto, @CurrentUser() user: AuthUser) {
     return this.service.create(dto, user);
   }
 
   /**
-   * PUT /deliveries/:id/status - Update shipment status
+   * PUT /shipments/:id/status - Update shipment status
    */
   @Put(':id/status')
   @ApiOperation({ summary: 'Update shipment status' })
@@ -92,7 +92,7 @@ export class DeliveriesController {
   }
 
   /**
-   * GET /deliveries/:id/items - List shipment items
+   * GET /shipments/:id/items - List shipment items
    */
   @Get(':id/items')
   @ApiOperation({ summary: 'List shipment items' })
@@ -104,7 +104,7 @@ export class DeliveriesController {
   }
 
   /**
-   * POST /deliveries/:id/items - Add shipment item (with batch)
+   * POST /shipments/:id/items - Add shipment item (with batch)
    */
   @Post(':id/items')
   @ApiOperation({ summary: 'Add shipment item (with batch)' })
