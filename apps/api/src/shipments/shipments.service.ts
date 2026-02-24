@@ -14,12 +14,12 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@repo/types';
-import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/delivery.dto';
+import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
 import { UserRoleEnum } from '../users/dto/user.dto';
 import { AuthUser } from '../auth';
 
 @Injectable()
-export class DeliveriesService {
+export class ShipmentsService {
   private supabase: SupabaseClient<Database>;
 
   constructor(config: ConfigService) {
