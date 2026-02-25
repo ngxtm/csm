@@ -246,8 +246,6 @@ export class ShipmentsService {
   }
 
   async update(id: number, dto: UpdateShipmentDto) {
-
-  console.log('DTO NHẬN ĐƯỢC:', dto);
   
   const { data: existing } = await this.supabase
     .from('shipments')
