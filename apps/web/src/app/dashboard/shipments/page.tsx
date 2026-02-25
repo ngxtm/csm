@@ -1,14 +1,12 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
 
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/";
 import { shipmentsApi } from "@/lib/api/shipments";
-import type {
-  ShipmentResponse,
-  ShipmentStatus,
-} from "@repo/types";
-import { shipmentStatusColors } from "@repo/types";
+import type { ShipmentResponse, ShipmentStatus } from "@repo/types";
 import CreateShipmentModal from "./components/create-shipment-modal";
+import { Pencil, Trash2 } from "lucide-react";
 
 export default function ShipmentsPage() {
   const [data, setData] = useState<ShipmentResponse[]>([]);
@@ -16,91 +14,81 @@ export default function ShipmentsPage() {
   const [isFormOpen, setIsFormOpen] = useState(false);
 
   const fetchShipments = async () => {
-  try {
-    const res = await shipmentsApi.getAll();
-    console.log("Dữ liệu nhận về:", res);
-    setData(Array.isArray(res.data) ? res.data : []);
-  } catch (error) {
-    console.error("Failed to fetch shipments:", error);
-    setData([]);
-  } finally {
-    setLoading(false);
-  }
-};
+    try {
+      setLoading(true);
+      const res = await shipmentsApi.getAll();
+      const finalData = Array.isArray(res) ? res : (res as any)?.data || [];
+      setData(finalData);
+    } catch (error) {
+      console.error("Failed to fetch shipments:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+  const handleDelete = async (id: number) => {
+    if (!confirm("Bạn có chắc chắn muốn xóa vận đơn này không?")) return;
+    try {
+      await shipmentsApi.delete(id);
+      alert("Xóa thành công!");
+      fetchShipments();
+    } catch (error: any) {
+      alert(error.message || "Xóa thất bại");
+    }
+  };
 
   useEffect(() => {
     fetchShipments();
   }, []);
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
+    <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold text-black">
-          Shipments
-        </h1>
-
-        <Button onClick={() => setIsFormOpen(true)}>
-          Add Shipment
+        <h1 className="text-2xl font-bold text-black">Shipments Management</h1>
+        <Button onClick={() => setIsFormOpen(true)} className="bg-blue-600 hover:bg-blue-700 text-white shadow-sm">
+          + Add Shipment
         </Button>
       </div>
 
-      {/* Table */}
-      <div className="overflow-hidden rounded-lg border bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-gray-100 text-left">
-            <tr>
-              <th className="p-3">ID</th>
-              <th className="p-3">Order ID</th>
-              <th className="p-3">Shipment Code</th>
-              <th className="p-3">Status</th>
-              <th className="p-3">Created At</th>
+      <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="bg-gray-100 border-b border-gray-200">
+              <th className="px-4 py-4 font-semibold text-gray-700">ID</th>
+              <th className="px-4 py-4 font-semibold text-gray-700">Order ID</th>
+              <th className="px-4 py-4 font-semibold text-gray-700">Shipment Code</th>
+              <th className="px-4 py-4 font-semibold text-gray-700">Status</th>
+              <th className="px-4 py-4 font-semibold text-gray-700">Created At</th>
+              <th className="px-4 py-4 font-semibold text-gray-700 text-center">Actions</th>
             </tr>
           </thead>
-
-          <tbody>
+          <tbody className="divide-y divide-gray-100">
             {loading ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="p-6 text-center"
-                >
-                  Loading...
-                </td>
-              </tr>
-            ) : (data?.length ?? 0) === 0 ? (
-              <tr>
-                <td
-                  colSpan={5}
-                  className="p-6 text-center text-gray-500"
-                >
-                  No shipments found
-                </td>
-              </tr>
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-black">Loading...</td></tr>
+            ) : data.length === 0 ? (
+              <tr><td colSpan={6} className="px-4 py-10 text-center text-gray-500">No shipments found.</td></tr>
             ) : (
               data.map((shipment) => (
-                <tr
-                  key={shipment.id}
-                  className="border-t hover:bg-gray-50"
-                >
-                  <td className="p-3">
-                    {shipment.id}
+                <tr key={shipment.id} className="hover:bg-blue-50/50 transition-colors">
+                  <td className="px-4 py-4 text-black font-medium">#{shipment.id}</td>
+                  <td className="px-4 py-4">
+                    <span className="bg-gray-100 px-2 py-1 rounded text-xs border border-gray-200 text-black">
+                      ORD-{shipment.order_id}
+                    </span>
                   </td>
-                  <td className="p-3">
-                    {shipment.order_id}
+                  <td className="px-4 py-4 font-mono text-sm text-blue-700 font-bold">{shipment.shipment_code}</td>
+                  <td className="px-4 py-4"><StatusBadge status={shipment.status} /></td>
+                  <td className="px-4 py-4 text-black text-sm">
+                    {new Date(shipment.created_at).toLocaleString('vi-VN')}
                   </td>
-                  <td className="p-3">
-                    {shipment.shipment_code}
-                  </td>
-                  <td className="p-3">
-                    <StatusBadge
-                      status={shipment.status}
-                    />
-                  </td>
-                  <td className="p-3">
-                    {new Date(
-                      shipment.created_at
-                    ).toLocaleString()}
+                  <td className="px-4 py-4">
+                    <div className="flex justify-center gap-2">
+                      <button className="p-2 hover:bg-gray-100 rounded-lg text-blue-600" title="Edit">
+                        <Pencil size={18} />
+                      </button>
+                      <button onClick={() => handleDelete(shipment.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600" title="Delete">
+                        <Trash2 size={18} />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))
@@ -109,32 +97,24 @@ export default function ShipmentsPage() {
         </table>
       </div>
 
-      {/* Modal */}
       {isFormOpen && (
         <CreateShipmentModal
-                  onSuccess={() => {
-                      setIsFormOpen(false);
-                      fetchShipments();
-                  } } isOpen={isFormOpen} onClose={() => setIsFormOpen(false)}        />
+          onSuccess={() => { setIsFormOpen(false); fetchShipments(); }}
+          isOpen={isFormOpen}
+          onClose={() => setIsFormOpen(false)}
+        />
       )}
     </div>
   );
 }
 
-function StatusBadge({
-  status,
-}: {
-  status: ShipmentStatus;
-}) {
-  const base =
-    "rounded-full px-3 py-1 text-xs font-medium";
-
-  const color =
-    shipmentStatusColors[status];
-
-  return (
-    <span className={`${base} ${color}`}>
-      {status}
-    </span>
-  );
+function StatusBadge({ status }: { status: ShipmentStatus }) {
+  const base = "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-bold uppercase tracking-wider shadow-sm border";
+  const colorMap: Record<string, string> = {
+    preparing: "bg-amber-100 text-amber-700 border-amber-200",
+    shipping: "bg-blue-100 text-blue-700 border-blue-200",
+    delivered: "bg-green-100 text-green-700 border-green-200",
+    cancelled: "bg-red-100 text-red-700 border-red-200",
+  };
+  return <span className={`${base} ${colorMap[status] || "bg-gray-100 text-gray-700"}`}>{status}</span>;
 }
