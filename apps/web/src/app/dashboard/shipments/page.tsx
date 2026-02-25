@@ -7,11 +7,14 @@ import { shipmentsApi } from "@/lib/api/shipments";
 import type { ShipmentResponse, ShipmentStatus } from "@repo/types";
 import CreateShipmentModal from "./components/create-shipment-modal";
 import { Pencil, Trash2 } from "lucide-react";
+import { EditShipmentModal } from "./components/edit-shipment-modal";
 
 export default function ShipmentsPage() {
   const [data, setData] = useState<ShipmentResponse[]>([]);
   const [loading, setLoading] = useState(true);
   const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [selectedShipment, setSelectedShipment] = useState<ShipmentResponse | null>(null);
 
   const fetchShipments = async () => {
     try {
@@ -36,10 +39,15 @@ export default function ShipmentsPage() {
     }
   };
 
+  const handleEdit = (shipment: ShipmentResponse) => {
+    setSelectedShipment(shipment);
+    setIsEditModalOpen(true);
+  };
+
   useEffect(() => {
     fetchShipments();
   }, []);
-
+  
   return (
     <div className="p-6 space-y-6 bg-gray-50 min-h-screen">
       <div className="flex items-center justify-between">
@@ -82,7 +90,7 @@ export default function ShipmentsPage() {
                   </td>
                   <td className="px-4 py-4">
                     <div className="flex justify-center gap-2">
-                      <button className="p-2 hover:bg-gray-100 rounded-lg text-blue-600" title="Edit">
+                      <button onClick={() => handleEdit(shipment)} className="p-2 hover:bg-gray-100 rounded-lg text-blue-600" title="Edit">
                         <Pencil size={18} />
                       </button>
                       <button onClick={() => handleDelete(shipment.id)} className="p-2 hover:bg-red-50 rounded-lg text-red-600" title="Delete">
@@ -102,6 +110,14 @@ export default function ShipmentsPage() {
           onSuccess={() => { setIsFormOpen(false); fetchShipments(); }}
           isOpen={isFormOpen}
           onClose={() => setIsFormOpen(false)}
+        />
+      )}
+      {isEditModalOpen && selectedShipment && (
+        <EditShipmentModal
+          shipment={selectedShipment}
+          onSuccess={() => { setIsEditModalOpen(false); fetchShipments(); }}
+          isOpen={isEditModalOpen}
+          onClose={() => setIsEditModalOpen(false)}
         />
       )}
     </div>

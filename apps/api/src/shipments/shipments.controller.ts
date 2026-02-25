@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/require-await */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
-/* eslint-disable @typescript-eslint/no-unsafe-return */
 /* eslint-disable prettier/prettier */
 import {
   Body,
@@ -9,8 +6,8 @@ import {
   Get,
   Param,
   ParseIntPipe,
+  Patch,
   Post,
-  Put,
 } from '@nestjs/common';
 import {
   ApiBearerAuth,
@@ -28,6 +25,7 @@ import {
 } from './dto/shipment.dto';
 import { ShipmentsService } from './shipments.service'
 import type { AuthUser } from '../auth';
+import type { UpdateShipmentDto } from '@repo/types';
 
 /**
  * Shipments Controller
@@ -78,9 +76,9 @@ export class ShipmentsController {
   }
 
   /**
-   * PUT /shipments/:id/status - Update shipment status
+   * PATCH /shipments/:id/status - Update shipment status
    */
-  @Put(':id/status')
+  @Patch(':id/status')
   @ApiOperation({ summary: 'Update shipment status' })
   @ApiParam({ name: 'id', type: Number })
   @ApiResponse({ status: 200, description: 'Shipment status updated' })
@@ -125,7 +123,6 @@ export class ShipmentsController {
   }
   
   /**
-   * 
    * DELETE /shipments/:id - Delete shipment
    */
   @Delete(':id')
@@ -133,5 +130,16 @@ export class ShipmentsController {
   @ApiParam({ name: 'id', type: Number })
   async remove(@Param('id', ParseIntPipe) id: number) {
     return this.service.remove(id);
+  }
+  
+  /**
+   * PATCH /shipments/:id - Update shipment details (driver info, notes)
+   */
+   @Patch(':id')
+  async update(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateShipmentDto
+  ) {
+    return this.service.update(id, dto);
   }
 }

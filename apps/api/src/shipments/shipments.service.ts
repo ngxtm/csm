@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@repo/types';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
+import { UpdateShipmentDto } from '@repo/types';
 import { UserRoleEnum } from '../users/dto/user.dto';
 import { AuthUser } from '../auth';
 
@@ -244,6 +245,38 @@ export class ShipmentsService {
     return { success: true };
   }
 
+  async update(id: number, dto: UpdateShipmentDto) {
+
+  console.log('DTO NHẬN ĐƯỢC:', dto);
+  
+  const { data: existing } = await this.supabase
+    .from('shipments')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (!existing) throw new NotFoundException('Không tìm thấy vận đơn');
+
+  if (existing?.status === 'cancelled' || existing?.status === 'delivered') {
+    throw new BadRequestException('Không thể chỉnh sửa thông tin vận đơn đã hủy hoặc đã hoàn thành');
+  }
+
+  const { error } = await this.supabase
+    .from('shipments')
+    .update({
+      driver_name: dto.driver_name,
+      driver_phone: dto.driver_phone,
+      notes: dto.notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new InternalServerErrorException('Lỗi chỉnh sửa thông tin');
+  return { success: true };
+}
+
   async remove(id: number) {
     const { data: existing, error: fetchError } = await this.supabase
       .from('shipments')
@@ -258,7 +291,7 @@ export class ShipmentsService {
 
     if (existing.status !== 'preparing') {
       throw new BadRequestException(
-        `Không thể xóa vận đơn đang ở trạng thái "${existing.status}". Chỉ có thể xóa khi đang ở trạng thái "preparing".`,
+        `Không thể xóa vận đơn đang ở trạng thái "${existing.status}". Chỉ vận đơn ở trạng thái "preparing" mới được phép xóa.`,
       );
     }
 
