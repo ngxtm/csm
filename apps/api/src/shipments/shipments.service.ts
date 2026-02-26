@@ -15,6 +15,7 @@ import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@repo/types';
 import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
+import { UpdateShipmentDto } from '@repo/types';
 import { UserRoleEnum } from '../users/dto/user.dto';
 import { AuthUser } from '../auth';
 
@@ -32,7 +33,9 @@ export class ShipmentsService {
   async findAll() {
     const { data, error } = await this.supabase
       .from('shipments')
-      .select('*, orders(order_code, store_id)');
+      .select('*, orders(order_code, store_id)')
+      .neq('status', 'cancelled') // Lọc ra: chỉ lấy những thằng KHÔNG PHẢI là cancelled/deleted
+      .order('id', { ascending: false });
 
     if (error) throw new InternalServerErrorException(error.message);
     return data;
@@ -78,9 +81,25 @@ export class ShipmentsService {
   }
 
   async create(dto: CreateShipmentDto, user: AuthUser) {
-    if (![UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR].includes(user.role as UserRoleEnum))
-    {
-      throw new ForbiddenException();
+    if (
+      ![UserRoleEnum.ADMIN, UserRoleEnum.COORDINATOR].includes(
+        user.role as UserRoleEnum,
+      )
+    ) {
+      throw new ForbiddenException('Bạn không có quyền tạo vận đơn');
+    }
+
+    const { data: existingShipment } = await this.supabase
+    .from('shipments')
+    .select('id')
+    .eq('order_id', dto.orderId)
+    .neq('status', 'cancelled')
+    .maybeSingle();
+
+    if (existingShipment) {
+      throw new BadRequestException(
+        `Đơn hàng #${dto.orderId} đã được tạo vận đơn trước đó.`,
+      );
     }
 
     const { data: order } = await this.supabase
@@ -94,7 +113,16 @@ export class ShipmentsService {
       throw new BadRequestException('Only processing orders can be shipped');
     }
 
-    const shipmentCode = `SHP-${Date.now().toString().slice(-6)}`;
+    const { data: lastShipment } = await this.supabase
+      .from('shipments')
+      .select('id')
+      .order('id', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+
+    const nextNumber = lastShipment ? lastShipment.id + 1 : 1;
+
+    const shipmentCode = `SHP-${nextNumber.toString().padStart(6, '0')}`;
 
     const { data: shipment, error } = await this.supabase
       .from('shipments')
@@ -215,5 +243,64 @@ export class ShipmentsService {
     await this.supabase.from('shipments').update(updateData).eq('id', id);
 
     return { success: true };
+  }
+
+  async update(id: number, dto: UpdateShipmentDto) {
+  
+  const { data: existing } = await this.supabase
+    .from('shipments')
+    .select('status')
+    .eq('id', id)
+    .single();
+
+  if (!existing) throw new NotFoundException('Không tìm thấy vận đơn');
+
+  if (existing?.status === 'cancelled' || existing?.status === 'delivered') {
+    throw new BadRequestException('Không thể chỉnh sửa thông tin vận đơn đã hủy hoặc đã hoàn thành');
+  }
+
+  const { error } = await this.supabase
+    .from('shipments')
+    .update({
+      driver_name: dto.driver_name,
+      driver_phone: dto.driver_phone,
+      notes: dto.notes,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', id)
+    .select()
+    .single();
+
+  if (error) throw new InternalServerErrorException('Lỗi chỉnh sửa thông tin');
+  return { success: true };
+}
+
+  async remove(id: number) {
+    const { data: existing, error: fetchError } = await this.supabase
+      .from('shipments')
+      .select('id, status')
+      .eq('id', id)
+      .maybeSingle();
+
+    if (fetchError) throw new InternalServerErrorException(fetchError.message);
+    if (!existing) {
+      throw new NotFoundException(`Shipment #${id} không tồn tại để xóa`);
+    }
+
+    if (existing.status !== 'preparing') {
+      throw new BadRequestException(
+        `Không thể xóa vận đơn đang ở trạng thái "${existing.status}". Chỉ vận đơn ở trạng thái "preparing" mới được phép xóa.`,
+      );
+    }
+
+    const { error: updateError } = await this.supabase
+      .from('shipments')
+      .update({ status: 'cancelled' })
+      .eq('id', id);
+
+    if (updateError)
+      throw new InternalServerErrorException(updateError.message);
+
+    return { success: true, message: `Đã hủy thành công vận đơn #${id}` };
   }
 }

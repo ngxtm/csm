@@ -11,6 +11,13 @@ interface PaginatedResponse<T> {
   meta: PaginationMeta;
 }
 
+export interface UpdateShipmentPayload {
+  driver_name?: string;
+  driver_phone?: string;
+  notes?: string;
+};
+
+
 /**
  * Shipments API Service
  */
@@ -45,6 +52,13 @@ export const shipmentsApi = {
     api.post<ShipmentResponse>("/shipments", data),
 
   /**
+   * Update shipment
+   */
+  update: async (id: number, payload: UpdateShipmentPayload) => {
+    return api.patch<ShipmentResponse>(`/shipments/${id}`, payload);
+  },
+
+  /**
    * Update shipment status
    */
   updateStatus: (
@@ -55,4 +69,10 @@ export const shipmentsApi = {
       `/shipments/${id}/status`,
       data
     ),
+
+    /**
+     * Delete shipment
+      */
+     delete: (id: number): Promise<void> =>
+    api.delete<void>(`/shipments/${id}`),
 };
