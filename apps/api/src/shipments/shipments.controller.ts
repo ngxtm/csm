@@ -2,7 +2,6 @@
 import {
   Body,
   Controller,
-  Delete,
   Get,
   Param,
   ParseIntPipe,
@@ -84,13 +83,23 @@ export class ShipmentsController {
   @ApiResponse({ status: 200, description: 'Shipment status updated' })
   @ApiResponse({ status: 400, description: 'Invalid status transition' })
   @ApiResponse({ status: 404, description: 'Shipment not found' })
-  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR)
+  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR, UserRoleEnum.ADMIN)
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: UpdateShipmentStatusDto,
-    @CurrentUser() user: AuthUser,
   ) {
-    return this.service.updateStatus(id, dto, user);
+    const statusMap: Record<
+      UpdateShipmentStatusDto['status'],
+      Parameters<ShipmentsService['updateStatus']>[1]
+    > = {
+      pending: 'pending',
+      preparing: 'preparing',
+      shipping: 'shipping',
+      delivered: 'delivered',
+      cancelled: 'cancelled',
+    };
+
+    return this.service.updateStatus(id, statusMap[dto.status]);
   }
 
   /**
@@ -114,7 +123,7 @@ export class ShipmentsController {
   @ApiResponse({ status: 201, description: 'Shipment item added' })
   @ApiResponse({ status: 400, description: 'Invalid batch or quantity' })
   @ApiResponse({ status: 404, description: 'Shipment not found' })
-  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR)
+  @Roles(UserRoleEnum.MANAGER, UserRoleEnum.COORDINATOR, UserRoleEnum.ADMIN)
   addItem(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: AddShipmentItemDto,
@@ -122,15 +131,15 @@ export class ShipmentsController {
     return this.service.addItem(id, dto);
   }
   
-  /**
-   * DELETE /shipments/:id - Delete shipment
-   */
-  @Delete(':id')
-  @ApiOperation({ summary: 'Delete shipment' })
-  @ApiParam({ name: 'id', type: Number })
-  async remove(@Param('id', ParseIntPipe) id: number) {
-    return this.service.remove(id);
-  }
+  // /**
+  //  * DELETE /shipments/:id - Delete shipment
+  //  */
+  // @Delete(':id')
+  // @ApiOperation({ summary: 'Delete shipment' })
+  // @ApiParam({ name: 'id', type: Number })
+  // async remove(@Param('id', ParseIntPipe) id: number) {
+  //   return this.service.remove(id);
+  // }
   
   /**
    * PATCH /shipments/:id - Update shipment details (driver info, notes)
@@ -141,5 +150,39 @@ export class ShipmentsController {
     @Body() dto: UpdateShipmentDto
   ) {
     return this.service.update(id, dto);
+  }
+
+  //shipment-items
+
+    /**
+   * GET /shipments/trace/:batchId - Forward trace (batch → shipments)
+   */
+  @Get('trace/:batchId')
+  @ApiOperation({ summary: 'Trace batch to shipments' })
+  @ApiParam({ name: 'batchId', type: Number })
+  traceBatch(@Param('batchId', ParseIntPipe) batchId: number) {
+    return this.service.traceBatch(batchId);
+  }
+
+  /**
+   * GET /shipments/:id/trace - Backward trace (shipment → batches)
+   */
+  @Get(':id/trace')
+  @ApiOperation({ summary: 'Trace shipment to batches' })
+  @ApiParam({ name: 'id', type: Number })
+  traceShipment(@Param('id', ParseIntPipe) id: number) {
+    return this.service.traceShipment(id);
+  }
+
+  /**
+   * PATCH /shipments/:id/items/:itemId - Update shipment item
+   */
+  @Patch(':shipmentId/items/:itemId')
+  updateItem(
+    @Param('shipmentId', ParseIntPipe) shipmentId: number,
+    @Param('itemId', ParseIntPipe) itemId: number,
+    @Body() dto: AddShipmentItemDto,
+  ) {
+    return this.service.updateItem(shipmentId, itemId, dto);
   }
 }

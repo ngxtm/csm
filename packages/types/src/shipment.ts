@@ -2,6 +2,7 @@ import { z } from "zod";
 
 export const SHIPMENT_STATUS = {
   PENDING: "pending",
+  PREPARING: "preparing",
   SHIPPING: "shipping",
   DELIVERED: "delivered",
   CANCELLED: "cancelled",
@@ -9,6 +10,7 @@ export const SHIPMENT_STATUS = {
 
 export const SHIPMENT_STATUS_VALUES = [
   "pending",
+  "preparing",
   "shipping",
   "delivered",
   "cancelled",
@@ -26,7 +28,8 @@ export const shipmentStatusColors: Record<
   string
 > = {
   pending: "bg-gray-100 text-gray-800",
-  shipping: "bg-yellow-100 text-yellow-800",
+  preparing: "bg-yellow-100 text-yellow-800",
+  shipping: "bg-blue-100 text-blue-800",
   delivered: "bg-green-100 text-green-800",
   cancelled: "bg-red-100 text-red-800",
 };
@@ -75,3 +78,10 @@ export const ShipmentResponse = z.object({
 
 export type ShipmentResponse =
   z.infer<typeof ShipmentResponse>;
+
+  export interface CreateShipmentItemPayload {
+  order_item_id: number;
+  batch_id?: number;
+  quantity_shipped: number;
+  note?: string;
+}

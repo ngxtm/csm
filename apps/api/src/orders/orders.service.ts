@@ -1,5 +1,10 @@
+/* eslint-disable @typescript-eslint/no-unsafe-return */
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
+/* eslint-disable @typescript-eslint/no-unsafe-assignment */
+/* eslint-disable prettier/prettier */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 import {
+  BadRequestException,
   ForbiddenException,
   Injectable,
   InternalServerErrorException,
@@ -401,6 +406,44 @@ export class OrdersService {
     }
 
     return this.findOne(id, null, user.role as UserRoleEnum);
+  }
+
+  async getOrderItemsWithRemaining(orderId: number) {
+    const { data, error } = await this.supabase
+      .from('order_items')
+      .select(`
+        id,
+        quantity_ordered,
+        item:item_id(name),
+        shipment_items(
+          quantity_shipped,
+          shipments(status)
+        )
+      `)
+      .eq('order_id', orderId);
+
+    if (error) {
+      throw new BadRequestException(error.message);
+    }
+
+    if (!data) return [];
+
+    return data.map((item) => {
+      const totalShipped =
+        item.shipment_items
+          ?.filter((s: any) => s.shipments?.status !== 'cancelled')
+          .reduce(
+            (sum: number, s: any) => sum + s.quantity_shipped,
+            0
+          ) ?? 0;
+
+      return {
+        ...item,
+        shipped_quantity: totalShipped,
+        remaining_quantity:
+          item.quantity_ordered - totalShipped,
+      };
+    });
   }
 
   // ═══════════════════════════════════════════════════════════

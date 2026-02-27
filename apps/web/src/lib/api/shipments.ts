@@ -1,8 +1,10 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 import { api } from "./client";
 import type {
   ShipmentResponse,
   CreateShipmentDto,
   UpdateShipmentStatusDto,
+  CreateShipmentItemPayload,
 } from "@repo/types";
 import type { PaginationMeta } from "@repo/types";
 
@@ -42,8 +44,9 @@ export const shipmentsApi = {
   /**
    * Get shipment by ID
    */
-  getById: (id: number) =>
-    api.get<ShipmentResponse>(`/shipments/${id}`),
+  getById: async (id: number) => {
+    return await api.get(`/shipments/${id}`);
+  },
 
   /**
    * Create shipment
@@ -70,9 +73,32 @@ export const shipmentsApi = {
       data
     ),
 
-    /**
-     * Delete shipment
-      */
-     delete: (id: number): Promise<void> =>
-    api.delete<void>(`/shipments/${id}`),
+    // /**
+    //  * Delete shipment
+    //   */
+    //  delete: (id: number): Promise<void> =>
+    // api.delete<void>(`/shipments/${id}`),
+
+  addItem: (
+    shipmentId: number,
+    data: CreateShipmentItemPayload
+  ) =>
+    api.post(
+      `/shipments/${shipmentId}/items`,
+      data
+    ),
+
+  updateItem: (
+    shipmentId: number,
+    itemId: number,
+    data: CreateShipmentItemPayload
+  ) =>
+    api.patch(
+      `/shipments/${shipmentId}/items/${itemId}`,
+      data
+    ),
+
+  getItems: (shipmentId: number) =>
+    api.get(`/shipments/${shipmentId}/items`),
+
 };
