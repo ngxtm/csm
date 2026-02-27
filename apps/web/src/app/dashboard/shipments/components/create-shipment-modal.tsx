@@ -36,7 +36,11 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess}: any) 
 
       // 2️⃣ Add shipment items
       for (const item of selectedItems) {
-        await shipmentsApi.addItem(shipmentId, item);
+        await shipmentsApi.addItem(shipmentId, {
+          order_item_id: item.order_item_id,
+          quantity_shipped: item.quantity_shipped,
+          batch_id: item.batch_id ?? null
+        });
       }
 
       alert("Tạo vận đơn thành công!");
@@ -63,9 +67,10 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess}: any) 
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title="Create New Shipment">
+      <div className="text-black">
       <form onSubmit={handleSubmit} className="space-y-4 p-4 text-black">
         {error && (
-          <div className="flex items-center gap-2 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
+        <div className="flex items-center gap-2 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
             <AlertCircle size={16} />
             <span>{error}</span>
           </div>
@@ -87,7 +92,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess}: any) 
           <p className="text-sm font-semibold">Chọn sản phẩm</p>
 
           {orderItems.map((item) => (
-            <div key={item.id} className="flex gap-2 items-center">
+            <div key={item.id} className="flex gap-2 items-center text-black">
               <div className="flex-1">
                 <p className="text-sm font-medium">{item.item?.name}</p>
                 <p className="text-xs text-gray-500">
@@ -95,29 +100,57 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess}: any) 
                 </p>
               </div>
 
+              {/* Quantity */}
               <input
                 type="number"
                 min={0}
                 max={item.remaining_quantity}
-                className="w-24 border rounded px-2 h-9"
+                className="w-20 border rounded px-2 h-9 text-black"
                 onChange={(e) => {
                   const qty = Number(e.target.value);
 
                   setSelectedItems((prev) => {
-                    const filtered = prev.filter((i) => i.order_item_id !== item.id);
+                    const existing = prev.find(i => i.order_item_id === item.id);
+                    const filtered = prev.filter(i => i.order_item_id !== item.id);
 
                     if (qty > 0) {
-                      return [...filtered, {
-                        order_item_id: item.id,
-                        quantity_shipped: qty
-                      }];
+                      return [
+                        ...filtered,
+                        {
+                          order_item_id: item.id,
+                          quantity_shipped: qty,
+                          batch_id: existing?.batch_id ?? null
+                        }
+                      ];
                     }
 
                     return filtered;
                   });
                 }}
               />
+
+              {/* Batch ID */}
+              <input
+                type="text"
+                placeholder="Batch ID (optional)"
+                className="w-32 border rounded px-2 h-9 text-black"
+                onChange={(e) => {
+                  const batch = e.target.value || null;
+
+                  setSelectedItems((prev) => {
+                    const existing = prev.find(i => i.order_item_id === item.id);
+                    if (!existing) return prev;
+
+                    return prev.map(i =>
+                      i.order_item_id === item.id
+                        ? { ...i, batch_id: batch }
+                        : i
+                    );
+                  });
+                }}
+              />
             </div>
+
           ))}
         </div>
 
@@ -164,6 +197,7 @@ export default function CreateShipmentModal({ isOpen, onClose, onSuccess}: any) 
           </Button>
         </div>
       </form>
+    </div>
     </Modal>
   );
 }

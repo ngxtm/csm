@@ -11,7 +11,7 @@ interface Props {
   onClose: () => void;
 }
 
-export default function ViewShipmentModal({
+export default function ViewShipmentModal({ 
   shipmentId,
   isOpen,
   onClose,

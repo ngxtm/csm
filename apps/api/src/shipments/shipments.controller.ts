@@ -177,12 +177,12 @@ export class ShipmentsController {
   /**
    * PATCH /shipments/:id/items/:itemId - Update shipment item
    */
-  @Patch(':id/items/:itemId')
-  @ApiOperation({ summary: 'Update shipment item quantity' })
+  @Patch(':shipmentId/items/:itemId')
   updateItem(
+    @Param('shipmentId', ParseIntPipe) shipmentId: number,
     @Param('itemId', ParseIntPipe) itemId: number,
     @Body() dto: AddShipmentItemDto,
   ) {
-    return this.service.updateItem(itemId, dto);
+    return this.service.updateItem(shipmentId, itemId, dto);
   }
 }

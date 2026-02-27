@@ -41,6 +41,8 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
         return {
           ...item,
           quantity_shipped: existing?.quantity_shipped || 0,
+          batch_id: existing?.batch_id || null,
+          shipment_item_id: existing?.id || null
         };
       });
 
@@ -51,6 +53,8 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
           .map((i: any) => ({
             order_item_id: i.id,
             quantity_shipped: i.quantity_shipped,
+            batch_id: i.batch_id ?? null,
+            shipment_item_id: i.shipment_item_id
           }))
       );
     };
@@ -73,7 +77,41 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
       });
 
       // 2️⃣ Sync shipment items
-      await shipmentsApi.replaceItems(shipment.id, selectedItems);
+      const currentItems = (await shipmentsApi.getItems(shipment.id)) as any[];
+
+      const itemsArray = Array.isArray(currentItems)
+      ? currentItems
+      : [];
+
+      // Update hoặc Add
+      for (const item of selectedItems) {
+        const existing = itemsArray.find(
+          (i: any) =>
+            i.order_item_id === item.order_item_id ||
+            i.order_item?.id === item.order_item_id
+        );
+
+        if (existing && existing.id) {
+          await shipmentsApi.updateItem(
+            shipment.id,
+            existing.id,
+            {
+              order_item_id: item.order_item_id,
+              quantity_shipped: item.quantity_shipped,
+              batch_id: item.batch_id ?? null
+            }
+          );
+        } else {
+          await shipmentsApi.addItem(
+            shipment.id,
+            {
+              order_item_id: item.order_item_id,
+              quantity_shipped: item.quantity_shipped,
+              batch_id: item.batch_id ?? null
+            }
+          );
+        }
+      }
 
       alert("Cập nhật vận đơn thành công!");
       onSuccess();
@@ -87,7 +125,8 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={`Edit ${shipment?.shipment_code}`}>
-      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+      <div className="text-black">
+      <form onSubmit={handleSubmit} className="p-4 space-y-4 text-black">
 
         {error && (
           <div className="p-3 bg-red-50 text-red-700 border rounded">
@@ -99,9 +138,9 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
           <p className="font-semibold text-sm">Chỉnh sửa sản phẩm</p>
 
           {orderItems.map((item: any) => (
-            <div key={item.id} className="flex gap-2 items-center">
+            <div key={item.id} className="flex gap-2 items-center text-black">
               <div className="flex-1">
-                <p className="text-sm font-medium">{item.product?.name}</p>
+                <p className="text-sm font-medium">{item.item?.name}</p>
                 <p className="text-xs text-gray-500">
                   Còn lại: {item.remaining_quantity}
                 </p>
@@ -115,14 +154,13 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
                   selectedItems.find(i => i.order_item_id === item.id)
                     ?.quantity_shipped || 0
                 }
-                className="w-24 border rounded px-2 h-9"
+                className="w-20 border rounded px-2 h-9 text-black"
                 onChange={(e) => {
                   const qty = Number(e.target.value);
 
                   setSelectedItems((prev) => {
-                    const filtered = prev.filter(
-                      (i) => i.order_item_id !== item.id
-                    );
+                    const existing = prev.find(i => i.order_item_id === item.id);
+                    const filtered = prev.filter(i => i.order_item_id !== item.id);
 
                     if (qty > 0) {
                       return [
@@ -130,12 +168,35 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
                         {
                           order_item_id: item.id,
                           quantity_shipped: qty,
-                        },
+                          batch_id: existing?.batch_id ?? null,
+                          shipment_item_id: existing?.shipment_item_id
+                        }
                       ];
                     }
 
                     return filtered;
                   });
+                }}
+              />
+
+              <input
+                type="text"
+                placeholder="Batch ID (optional)"
+                value={
+                  selectedItems.find(i => i.order_item_id === item.id)
+                    ?.batch_id || ""
+                }
+                className="w-32 border rounded px-2 h-9 text-black"
+                onChange={(e) => {
+                  const batch = e.target.value || null;
+
+                  setSelectedItems(prev =>
+                    prev.map(i =>
+                      i.order_item_id === item.id
+                        ? { ...i, batch_id: batch }
+                        : i
+                    )
+                  );
                 }}
               />
             </div>
@@ -175,6 +236,7 @@ export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any)
           </Button>
         </div>
       </form>
+      </div>
     </Modal>
   );
 }

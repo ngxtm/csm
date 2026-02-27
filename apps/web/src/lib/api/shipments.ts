@@ -79,18 +79,26 @@ export const shipmentsApi = {
     //  delete: (id: number): Promise<void> =>
     // api.delete<void>(`/shipments/${id}`),
 
-     addItem: (
+  addItem: (
     shipmentId: number,
     data: CreateShipmentItemPayload
-    ) =>
+  ) =>
     api.post(
       `/shipments/${shipmentId}/items`,
       data
     ),
 
-    replaceItems: (shipment_id: number, items: any[]) =>
-      api.put(`/shipments/${shipment_id}/items`, { items }),
+  updateItem: (
+    shipmentId: number,
+    itemId: number,
+    data: CreateShipmentItemPayload
+  ) =>
+    api.patch(
+      `/shipments/${shipmentId}/items/${itemId}`,
+      data
+    ),
 
-    getItems: (shipment_id: number) =>
-      api.get(`/shipments/${shipment_id}/items`),
+  getItems: (shipmentId: number) =>
+    api.get(`/shipments/${shipmentId}/items`),
+
 };

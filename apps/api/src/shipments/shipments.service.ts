@@ -437,12 +437,13 @@ export class ShipmentsService {
     return data;
   }
 
-  async updateItem(itemId: number, dto: AddShipmentItemDto) {
+  async updateItem(shipmentId: number, itemId: number, dto: AddShipmentItemDto) {
 
     const { data: shipmentItem, error: itemError } = await this.supabase
       .from('shipment_items')
       .select('id, shipment_id, order_item_id')
       .eq('id', itemId)
+      .eq('shipment_id', shipmentId)
       .single();
 
     if (itemError || !shipmentItem) {
@@ -452,7 +453,7 @@ export class ShipmentsService {
     const { data: shipment } = await this.supabase
       .from('shipments')
       .select('status')
-      .eq('id', shipmentItem.shipment_id)
+      .eq('id', shipmentId)
       .single();
 
     if (!shipment) {
