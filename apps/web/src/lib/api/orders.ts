@@ -6,7 +6,8 @@ import {
     OrderStatus,
     CreateOrderItemDto,
     OrderItemResponse,
-    OrderResponseWithPagination
+    OrderResponseWithPagination,
+    OrderItemWithRemaining
 } from '@repo/types';
 
 /**
@@ -65,5 +66,10 @@ export const orderApi = {
     update: async (orderId: number, data: CreateOrderDto) => {
         console.log(orderId, data)
         await api.put<OrderResponse>(`/orders/${orderId}`, data)
-    }
+    },
+
+    getOrderItemsWithRemaining: async (orderId: number) =>
+  await api.get<OrderItemWithRemaining[]>(
+    `/orders/${orderId}/items-with-remaining`
+  ),
 };

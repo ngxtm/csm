@@ -1,132 +1,176 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 "use client";
+
 import { useEffect, useState } from "react";
 import { Modal, Button } from "@/components/ui";
 import { shipmentsApi } from "@/lib/api/shipments";
-import { AlertCircle, Calendar } from "lucide-react";
+import { orderApi } from "@/lib/api/orders";
+import { AlertCircle } from "lucide-react";
 
 export function EditShipmentModal({ shipment, isOpen, onClose, onSuccess }: any) {
   const [driverName, setDriverName] = useState("");
   const [driverPhone, setDriverPhone] = useState("");
   const [notes, setNotes] = useState("");
+  const [orderItems, setOrderItems] = useState<any[]>([]);
+  const [selectedItems, setSelectedItems] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  const formatDate = (dateString: string | null) => {
-    if (!dateString) return "Chưa cập nhật";
-    return new Date(dateString).toLocaleString('vi-VN');
-  };
-
+  // load dữ liệu khi mở modal
   useEffect(() => {
-    if (isOpen && shipment) {
+    if (!isOpen || !shipment) return;
+
+    const init = async () => {
       setDriverName(shipment.driver_name || "");
       setDriverPhone(shipment.driver_phone || "");
       setNotes(shipment.notes || "");
-      setError(null);
-    }
+
+      // 1️⃣ Load order items remaining
+      const items = await orderApi.getOrderItemsWithRemaining(
+        shipment.order_id
+      );
+
+      // 2️⃣ Load shipment items hiện tại
+      const shipmentItems = (await shipmentsApi.getItems(shipment.id)) as any[];
+
+     const merged = items.map((item: any) => {
+        const existing = shipmentItems.find(
+          (s: any) => s.order_item_id === item.id
+        );
+
+        return {
+          ...item,
+          quantity_shipped: existing?.quantity_shipped || 0,
+        };
+      });
+
+      setOrderItems(merged);
+      setSelectedItems(
+        merged
+          .filter((i: any) => i.quantity_shipped > 0)
+          .map((i: any) => ({
+            order_item_id: i.id,
+            quantity_shipped: i.quantity_shipped,
+          }))
+      );
+    };
+
+    init();
   }, [isOpen, shipment]);
 
-  const handleUpdate = async (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+
     try {
       setIsLoading(true);
       setError(null);
-      
+
+      // 1️⃣ Update shipment info
       await shipmentsApi.update(shipment.id, {
-        driver_name: driverName, 
-        driver_phone: driverPhone, 
-        notes: notes
+        driver_name: driverName,
+        driver_phone: driverPhone,
+        notes,
       });
 
-      alert("Cập nhật thành công!");
+      // 2️⃣ Sync shipment items
+      await shipmentsApi.replaceItems(shipment.id, selectedItems);
+
+      alert("Cập nhật vận đơn thành công!");
       onSuccess();
       onClose();
     } catch (err: any) {
-      setError(err.response?.data?.message || "Không thể cập nhật thông tin");
+      setError(err.message || "Lỗi cập nhật");
     } finally {
       setIsLoading(false);
     }
   };
 
   return (
-    <Modal isOpen={isOpen} onClose={onClose} title={`Chỉnh sửa vận đơn: ${shipment?.shipment_code}`}>
-      {/* Thêm text-black ở form để toàn bộ chữ bên trong màu đen */}
-      <form onSubmit={handleUpdate} className="p-4 space-y-4 text-black">
+    <Modal isOpen={isOpen} onClose={onClose} title={`Edit ${shipment?.shipment_code}`}>
+      <form onSubmit={handleSubmit} className="p-4 space-y-4">
+
         {error && (
-          <div className="flex items-center gap-2 p-3 text-sm text-red-700 bg-red-50 border border-red-200 rounded-lg">
-            <AlertCircle size={16} />
-            <span>{error}</span>
+          <div className="p-3 bg-red-50 text-red-700 border rounded">
+            <AlertCircle size={16} /> {error}
           </div>
         )}
+        
+        <div className="border rounded p-3 space-y-3 text-black">
+          <p className="font-semibold text-sm">Chỉnh sửa sản phẩm</p>
 
-        <div className="grid grid-cols-2 gap-4 p-3 bg-gray-100 rounded-lg border border-gray-200 mb-4">
-          <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold">Mã Đơn Hàng</label>
-            <p className="text-sm font-bold text-black">ORD-{shipment?.order_id}</p>
-          </div>
-          <div>
-            <label className="block text-[10px] uppercase tracking-wider text-gray-600 font-bold">Trạng thái</label>
-            <p className="text-sm font-bold capitalize text-blue-700">{shipment?.status}</p>
-          </div>
-        </div>
+          {orderItems.map((item: any) => (
+            <div key={item.id} className="flex gap-2 items-center">
+              <div className="flex-1">
+                <p className="text-sm font-medium">{item.product?.name}</p>
+                <p className="text-xs text-gray-500">
+                  Còn lại: {item.remaining_quantity}
+                </p>
+              </div>
 
-        <div className="space-y-4">
-          <div>
-            <label className="block text-sm font-bold text-black mb-1">Tên tài xế</label>
-            <input
-              type="text"
-              value={driverName}
-              onChange={(e) => setDriverName(e.target.value)}
-              className="w-full h-11 border border-gray-300 text-black rounded-lg px-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-            />
-          </div>
+              <input
+                type="number"
+                min={0}
+                max={item.remaining_quantity}
+                value={
+                  selectedItems.find(i => i.order_item_id === item.id)
+                    ?.quantity_shipped || 0
+                }
+                className="w-24 border rounded px-2 h-9"
+                onChange={(e) => {
+                  const qty = Number(e.target.value);
 
-          <div>
-            <label className="block text-sm font-bold text-black mb-1">Số điện thoại</label>
-            <input
-              type="text"
-              value={driverPhone}
-              onChange={(e) => setDriverPhone(e.target.value)}
-              className="w-full h-11 border border-gray-300 text-black rounded-lg px-3 focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder:text-gray-400"
-            />
-          </div>
+                  setSelectedItems((prev) => {
+                    const filtered = prev.filter(
+                      (i) => i.order_item_id !== item.id
+                    );
 
-          <div>
-            <label className="block text-sm font-bold text-black mb-1">Ghi chú</label>
-            <textarea
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="w-full h-24 border border-gray-300 text-black rounded-lg px-3 py-2 focus:ring-2 focus:ring-blue-500 outline-none transition-all resize-none placeholder:text-gray-400"
-            />
-          </div>
-        </div>
+                    if (qty > 0) {
+                      return [
+                        ...filtered,
+                        {
+                          order_item_id: item.id,
+                          quantity_shipped: qty,
+                        },
+                      ];
+                    }
 
-        <div className="pt-4 border-t border-gray-200 space-y-2">
-          <div className="flex items-center gap-2 text-xs text-gray-700 font-bold">
-            <Calendar size={14} />
-            <span>Thông tin lộ trình (Tự động cập nhật)</span>
-          </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="p-2 bg-orange-50 rounded border border-orange-200">
-              <span className="block text-[10px] text-orange-700 font-bold uppercase">Ngày xuất kho</span>
-              <span className="text-xs font-medium text-black">{formatDate(shipment?.shipped_date)}</span>
+                    return filtered;
+                  });
+                }}
+              />
             </div>
-            <div className="p-2 bg-green-50 rounded border border-green-200">
-              <span className="block text-[10px] text-green-700 font-bold uppercase">Ngày hoàn thành</span>
-              <span className="text-xs font-medium text-black">{formatDate(shipment?.delivered_date)}</span>
-            </div>
-          </div>
+          ))}
         </div>
 
-        <div className="flex justify-end gap-3 pt-6 border-t border-gray-200">
-          <Button type="button" variant="secondary" onClick={onClose} className="text-black" disabled={isLoading}>
+        {/* DRIVER INFO */}
+        <input
+          type="text"
+          value={driverName}
+          onChange={(e) => setDriverName(e.target.value)}
+          placeholder="Tên tài xế"
+          className="w-full border rounded px-3 h-10"
+        />
+
+        <input
+          type="text"
+          value={driverPhone}
+          onChange={(e) => setDriverPhone(e.target.value)}
+          placeholder="SĐT tài xế"
+          className="w-full border rounded px-3 h-10"
+        />
+
+        <textarea
+          value={notes}
+          onChange={(e) => setNotes(e.target.value)}
+          placeholder="Ghi chú"
+          className="w-full border rounded px-3 py-2"
+        />
+
+        <div className="flex justify-end gap-3 pt-4 border-t">
+          <Button type="button" variant="secondary" onClick={onClose}>
             Hủy
           </Button>
-          <Button 
-            type="submit" 
-            loading={isLoading} 
-            className="bg-blue-600 hover:bg-blue-700 text-white px-8 font-bold"
-          >
+          <Button type="submit" loading={isLoading}>
             Lưu thay đổi
           </Button>
         </div>

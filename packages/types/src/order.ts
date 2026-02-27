@@ -119,3 +119,18 @@ export const UpdateOrderStatusDto = z.object({
   notes: z.string().optional(),
 });
 export type UpdateOrderStatusDto = z.infer<typeof UpdateOrderStatusDto>;
+
+export interface OrderItemWithRemaining {
+  id: number;
+  order_id: number;
+  product_id: number;
+  quantity: number;
+
+  shipped_quantity: number;
+  remaining_quantity: number;
+
+  product?: {
+    id: number;
+    name: string;
+  };
+}

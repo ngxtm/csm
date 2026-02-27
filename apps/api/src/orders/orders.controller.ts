@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable prettier/prettier */
 import {
   Body,
@@ -8,6 +9,7 @@ import {
   Post,
   Put,
   Query,
+  Req,
   UseGuards,
 } from '@nestjs/common';
 import {
@@ -223,6 +225,19 @@ export class OrdersController {
     console.log(dto)
     return this.ordersService.update(id, dto, user);
   }
+
+  @Get(':id/items-with-remaining')
+  getOrderItemsWithRemaining(
+    @Param('id', ParseIntPipe) orderId: number
+  ) {
+    return this.ordersService.getOrderItemsWithRemaining(orderId);
+  }
+
+  @Get(':id')
+  getById(@Param('id', ParseIntPipe) id: number, @Req() req: any,
+) {
+    return this.ordersService.findOne(id, null, req.user.role as UserRoleEnum);
+}
 }
 
 

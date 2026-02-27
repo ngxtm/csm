@@ -1,6 +1,4 @@
 /* eslint-disable prettier/prettier */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
-/* eslint-disable @typescript-eslint/no-unsafe-assignment */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-unsafe-enum-comparison */
@@ -14,7 +12,7 @@ import {
 import { ConfigService } from '@nestjs/config';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@repo/types';
-import { CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
+import { AddShipmentItemDto, CreateShipmentDto, UpdateShipmentStatusDto } from './dto/shipment.dto';
 import { UpdateShipmentDto } from '@repo/types';
 import { UserRoleEnum } from '../users/dto/user.dto';
 import { AuthUser } from '../auth';
@@ -30,11 +28,44 @@ export class ShipmentsService {
     );
   }
 
+  private async updateOrderFulfillmentStatus(orderId: number) {
+    const { data: items } = await this.supabase
+      .from('order_items')
+      .select('id, quantity_ordered')
+      .eq('order_id', orderId);
+
+    let fullyFulfilled = true;
+    let partially = false;
+
+    for (const item of items ?? []) {
+     const { data: shipped } = await this.supabase
+      .from('shipment_items')
+      .select(`
+        quantity_shipped,
+        shipments!inner(status)
+      `)
+      .eq('order_item_id', item.id)
+      .neq('shipments.status', 'cancelled');
+
+      const total =
+        shipped?.reduce((sum, r) => sum + r.quantity_shipped, 0) ?? 0;
+
+      if (total < item.quantity_ordered) fullyFulfilled = false;
+      if (total > 0) partially = true;
+    }
+
+    let status = 'processing';
+    if (fullyFulfilled) status = 'fulfilled';
+    else if (partially) status = 'partially_fulfilled';
+
+    await this.supabase.from('orders').update({ status }).eq('id', orderId);
+  }
+
   async findAll() {
     const { data, error } = await this.supabase
       .from('shipments')
       .select('*, orders(order_code, store_id)')
-      .neq('status', 'cancelled') // Lọc ra: chỉ lấy những thằng KHÔNG PHẢI là cancelled/deleted
+      .neq('status', 'cancelled')
       .order('id', { ascending: false });
 
     if (error) throw new InternalServerErrorException(error.message);
@@ -92,20 +123,14 @@ export class ShipmentsService {
     const { data: existingShipment } = await this.supabase
     .from('shipments')
     .select('id')
-    .eq('order_id', dto.orderId)
+    .eq('order_id', dto.order_id)
     .neq('status', 'cancelled')
     .maybeSingle();
-
-    if (existingShipment) {
-      throw new BadRequestException(
-        `Đơn hàng #${dto.orderId} đã được tạo vận đơn trước đó.`,
-      );
-    }
 
     const { data: order } = await this.supabase
       .from('orders')
       .select('id, status, store_id')
-      .eq('id', dto.orderId)
+      .eq('id', dto.order_id)
       .single();
 
     if (!order) throw new BadRequestException('Order not found');
@@ -128,9 +153,9 @@ export class ShipmentsService {
       .from('shipments')
       .insert({
         shipment_code: shipmentCode,
-        order_id: dto.orderId,
-        driver_name: dto.driverName,
-        driver_phone: dto.driverPhone,
+        order_id: dto.order_id,
+        driver_name: dto.driver_name,
+        driver_phone: dto.driver_phone,
         notes: dto.notes,
       })
       .select()
@@ -138,6 +163,27 @@ export class ShipmentsService {
 
     if (error || !shipment) {
       throw new InternalServerErrorException('Failed to create shipment');
+    }
+
+    const { data: orderItems } = await this.supabase
+      .from('order_items')
+      .select('id, quantity_ordered')
+      .eq('order_id', dto.order_id);
+
+    if (orderItems?.length) {
+      const { error: itemsError } = await this.supabase
+        .from('shipment_items')
+        .insert(
+          orderItems.map(item => ({
+            shipment_id: shipment.id,
+            order_item_id: item.id,
+            quantity_shipped: item.quantity_ordered,
+          })),
+        );
+
+      if (itemsError) {
+        throw new InternalServerErrorException('Failed to create shipment items');
+      }
     }
 
     return shipment;
@@ -159,148 +205,309 @@ export class ShipmentsService {
     return data;
   }
 
-  async addItem(shipmentId: number, dto: any) {
-    const { data: batch } = await this.supabase
-      .from('batches')
-      .select('current_quantity, item_id')
-      .eq('id', dto.batchId)
+  async addItem(shipmentId: number, dto: AddShipmentItemDto) {
+    const { data: shipment } = await this.supabase
+      .from('shipments')
+      .select('id, status, order_id')
+      .eq('id', shipmentId)
       .single();
 
-    if (!batch) {
-      throw new NotFoundException('Batch not found');
+    if (!shipment) throw new NotFoundException('Shipment not found');
+
+    if (shipment.status !== 'preparing') {
+      throw new BadRequestException('Only preparing shipment can add items');
     }
 
-    if (batch.current_quantity < dto.quantityShipped) {
+    // kiểm tra order_item thuộc order này không
+    const { data: orderItem } = await this.supabase
+      .from('order_items')
+      .select('id, quantity_ordered')
+      .eq('id', dto.order_item_id)
+      .eq('order_id', shipment.order_id)
+      .single();
+
+    if (!orderItem) {
+      throw new BadRequestException('Order item does not belong to this order');
+    }
+
+    const { data: shippedRows } = await this.supabase
+      .from('shipment_items')
+      .select(`
+        quantity_shipped,
+        shipments!inner(status)
+      `)
+      .eq('order_item_id', dto.order_item_id)
+      .neq('shipments.status', 'cancelled');
+
+    const totalShipped =
+      shippedRows?.reduce((sum, r) => sum + r.quantity_shipped, 0) ?? 0;
+
+    if (totalShipped + dto.quantity_shipped > orderItem.quantity_ordered) {
+      throw new BadRequestException('Exceed order quantity');
+    }
+
+    const { data: batch } = await this.supabase
+      .from('batches')
+      .select('current_quantity')
+      .eq('id', dto.batch_id)
+      .single();
+
+    if (!batch || batch.current_quantity < dto.quantity_shipped) {
       throw new BadRequestException('Insufficient batch stock');
     }
 
     const { error } = await this.supabase.from('shipment_items').insert({
       shipment_id: shipmentId,
-      order_item_id: dto.orderItemId,
-      batch_id: dto.batchId,
-      quantity_shipped: dto.quantityShipped,
+      order_item_id: dto.order_item_id,
+      batch_id: dto.batch_id,
+      quantity_shipped: dto.quantity_shipped,
       note: dto.note,
     });
 
     if (error) throw new InternalServerErrorException(error.message);
 
-    const { data, error: shipmentError } = await this.supabase
-      .from('shipments')
-      .select('orders(store_id)')
-      .eq('id', shipmentId)
-      .single();
-
-    if (!data?.orders?.store_id) {
-      throw new BadRequestException('Invalid shipment or order');
-    }
-
-    const storeId = data.orders.store_id;
-
-    await this.supabase.from('inventory_transactions').insert({
-      store_id: storeId,
-      item_id: batch.item_id,
-      batch_id: dto.batchId,
-      quantity_change: -dto.quantityShipped,
-      transaction_type: 'export',
-      reference_type: 'shipment',
-      reference_id: shipmentId,
-    });
-
     return { success: true };
   }
 
-  async updateStatus(id: number, dto: UpdateShipmentStatusDto, user: AuthUser) {
+  async updateStatus(id: number, newStatus: 'pending' | 'preparing' | 'shipping' | 'delivered' | 'cancelled') {
     const { data: shipment } = await this.supabase
       .from('shipments')
-      .select('id, status, order_id')
+      .select('*')
       .eq('id', id)
       .single();
 
-    if (!shipment) throw new NotFoundException('Shipment not found');
-
-    if (shipment.status === 'delivered') {
-      throw new BadRequestException('Shipment already delivered');
+    if (!shipment) {
+      throw new BadRequestException('Shipment not found');
     }
 
-    const updateData: any = {
-      status: dto.status,
-      updated_at: new Date().toISOString(),
-    };
+    const currentStatus = shipment.status;
 
-    if (dto.status === 'shipping') {
+    // 🚨 Rule chuyển trạng thái
+    const allowedTransitions: Record<string, string[]> = {
+      pending: ['preparing', 'cancelled'],
+      preparing: ['shipping', 'cancelled'],
+      shipping: ['delivered'],
+      delivered: [],
+      cancelled: [],
+    };
+    if (!allowedTransitions[currentStatus].includes(newStatus)) {
+      throw new BadRequestException(
+        `Không thể chuyển từ ${currentStatus} sang ${newStatus}`
+      );
+    }
+
+    const updateData: any = { status: newStatus };
+
+    if (newStatus === 'shipping') {
       updateData.shipped_date = new Date().toISOString();
     }
 
-    if (dto.status === 'delivered') {
+    if (newStatus === 'delivered') {
       updateData.delivered_date = new Date().toISOString();
-
-      await this.supabase
-        .from('orders')
-        .update({ status: 'delivered' })
-        .eq('id', shipment.order_id);
     }
 
-    await this.supabase.from('shipments').update(updateData).eq('id', id);
+    if (newStatus === 'cancelled') {
+      updateData.shipped_date = null;
+      updateData.delivered_date = null;
+    }
 
-    return { success: true };
+    const { data, error } = await this.supabase
+      .from('shipments')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return data;
   }
 
-  async update(id: number, dto: UpdateShipmentDto) {
-  
-  const { data: existing } = await this.supabase
-    .from('shipments')
-    .select('status')
-    .eq('id', id)
-    .single();
+  async update(id: number, dto: UpdateShipmentDto & { status?: string }) {
+    const { data: existing, error: fetchError } = await this.supabase
+      .from('shipments')
+      .select('status, order_id')
+      .eq('id', id)
+      .single();
 
-  if (!existing) throw new NotFoundException('Không tìm thấy vận đơn');
+    if (fetchError || !existing) throw new NotFoundException('Vận đơn không tồn tại');
 
-  if (existing?.status === 'cancelled' || existing?.status === 'delivered') {
-    throw new BadRequestException('Không thể chỉnh sửa thông tin vận đơn đã hủy hoặc đã hoàn thành');
-  }
+    // Không cho sửa nếu đã hoàn thành hoặc đã hủy (trừ khi là admin muốn khôi phục - tùy logic của bạn)
+    if (['delivered', 'cancelled'].includes(existing.status)) {
+       throw new BadRequestException('Không thể chỉnh sửa vận đơn đã kết thúc');
+    }
 
-  const { error } = await this.supabase
-    .from('shipments')
-    .update({
+    const updateData: any = {
       driver_name: dto.driver_name,
       driver_phone: dto.driver_phone,
       notes: dto.notes,
       updated_at: new Date().toISOString(),
-    })
-    .eq('id', id)
-    .select()
-    .single();
+    };
 
-  if (error) throw new InternalServerErrorException('Lỗi chỉnh sửa thông tin');
-  return { success: true };
-}
+    // 🎯 Nếu có thay đổi status từ bảng hoặc modal
+    if (dto.status && dto.status !== existing.status) {
+      const allowed: Record<string, string[]> = {
+        preparing: ['pending', 'cancelled'],
+        pending: ['shipping', 'cancelled'],
+        shipping: ['delivered', 'cancelled'],
+      };
 
-  async remove(id: number) {
-    const { data: existing, error: fetchError } = await this.supabase
-      .from('shipments')
-      .select('id, status')
-      .eq('id', id)
-      .maybeSingle();
+      if (!allowed[existing.status]?.includes(dto.status)) {
+        throw new BadRequestException(`Lỗi: Không thể chuyển từ ${existing.status} sang ${dto.status}`);
+      }
 
-    if (fetchError) throw new InternalServerErrorException(fetchError.message);
-    if (!existing) {
-      throw new NotFoundException(`Shipment #${id} không tồn tại để xóa`);
+      updateData.status = dto.status;
+      if (dto.status === 'shipping') updateData.shipped_date = new Date().toISOString();
+      if (dto.status === 'completed') updateData.delivered_date = new Date().toISOString();
     }
 
-    if (existing.status !== 'preparing') {
+    const { data, error } = await this.supabase
+      .from('shipments')
+      .update(updateData)
+      .eq('id', id)
+      .select()
+      .single();
+
+    if (error) throw new InternalServerErrorException(error.message);
+
+    // 🔄 Cập nhật trạng thái Order dựa trên các Shipment "sống" (không bị cancelled)
+    await this.updateOrderFulfillmentStatus(existing.order_id);
+
+    return data;
+  }
+
+  // async remove(id: number) {
+  //   const { data: existing, error: fetchError } = await this.supabase
+  //     .from('shipments')
+  //     .select('id, status')
+  //     .eq('id', id)
+  //     .maybeSingle();
+
+  //   if (fetchError) throw new InternalServerErrorException(fetchError.message);
+  //   if (!existing) {
+  //     throw new NotFoundException(`Shipment #${id} không tồn tại để xóa`);
+  //   }
+
+  //   if (existing.status !== 'preparing') {
+  //     throw new BadRequestException(
+  //       `Không thể xóa vận đơn đang ở trạng thái "${existing.status}". Chỉ vận đơn ở trạng thái "preparing" mới được phép xóa.`,
+  //     );
+  //   }
+
+  //   const { error: updateError } = await this.supabase
+  //     .from('shipments')
+  //     .update({ status: 'cancelled' })
+  //     .eq('id', id);
+
+  //   if (updateError)
+  //     throw new InternalServerErrorException(updateError.message);
+
+  //   return { success: true, message: `Đã hủy thành công vận đơn #${id}` };
+  // }
+
+  async traceBatch(batchId: number) {
+    const { data, error } = await this.supabase
+      .from('shipment_items')
+      .select(`
+        quantity_shipped,
+        shipments (
+          shipment_code,
+          status,
+          orders ( order_code, store_id )
+        )
+      `)
+      .eq('batch_id', batchId);
+
+    if (error) throw new InternalServerErrorException(error.message);
+    return data;
+  }
+
+  async traceShipment(id: number) {
+    const { data, error } = await this.supabase
+      .from('shipment_items')
+      .select(`
+        quantity_shipped,
+        batches ( batch_code, expiry_date )
+      `)
+      .eq('shipment_id', id);
+
+    if (error) throw new InternalServerErrorException(error.message);
+    return data;
+  }
+
+  async updateItem(itemId: number, dto: AddShipmentItemDto) {
+
+    const { data: shipmentItem, error: itemError } = await this.supabase
+      .from('shipment_items')
+      .select('id, shipment_id, order_item_id')
+      .eq('id', itemId)
+      .single();
+
+    if (itemError || !shipmentItem) {
+      throw new BadRequestException('Shipment item not found');
+    }
+
+    const { data: shipment } = await this.supabase
+      .from('shipments')
+      .select('status')
+      .eq('id', shipmentItem.shipment_id)
+      .single();
+
+    if (!shipment) {
+      throw new BadRequestException('Shipment not found');
+    }
+
+    if (shipment.status !== 'pending') {
       throw new BadRequestException(
-        `Không thể xóa vận đơn đang ở trạng thái "${existing.status}". Chỉ vận đơn ở trạng thái "preparing" mới được phép xóa.`,
+        'Chỉ được chỉnh sửa sản phẩm khi shipment ở trạng thái pending'
       );
     }
 
-    const { error: updateError } = await this.supabase
-      .from('shipments')
-      .update({ status: 'cancelled' })
-      .eq('id', id);
+    if (dto.quantity_shipped <= 0) {
+      throw new BadRequestException('Quantity must be greater than 0');
+    }
 
-    if (updateError)
-      throw new InternalServerErrorException(updateError.message);
+    const { data: orderItem } = await this.supabase
+      .from('order_items')
+      .select('quantity_ordered')
+      .eq('id', shipmentItem.order_item_id)
+      .single();
 
-    return { success: true, message: `Đã hủy thành công vận đơn #${id}` };
+    if (!orderItem) {
+      throw new BadRequestException('Order item not found');
+    }
+
+    const { data: shippedItems } = await this.supabase
+      .from('shipment_items')
+      .select(`
+        quantity_shipped,
+        shipments!inner(status)
+      `)
+      .eq('order_item_id', shipmentItem.order_item_id)
+      .neq('id', itemId)
+      .neq('shipments.status', 'cancelled');
+
+    const totalShipped =
+      shippedItems?.reduce((sum, i) => sum + i.quantity_shipped, 0) ?? 0;
+
+    if (totalShipped + dto.quantity_shipped > orderItem.quantity_ordered) {
+      throw new BadRequestException('Vượt quá số lượng còn lại của đơn hàng');
+    }
+
+    const { error } = await this.supabase
+      .from('shipment_items')
+      .update({
+        quantity_shipped: dto.quantity_shipped,
+        note: dto.note,
+      })
+      .eq('id', itemId);
+
+    if (error) {
+      throw new InternalServerErrorException(error.message);
+    }
+
+    return { success: true };
   }
 }
